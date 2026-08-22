@@ -101,7 +101,8 @@ d'importer la version retouchée.
 ## Développement
 
 ```
-node tools/make-sample.js                 # regénère l'exemple synthétique
+node tools/test-all.js                    # toute la chaîne de vérification
+node tools/make-sample.js                 # regénère les exemples synthétiques
 node tools/selftest.js [fichier.gpx]      # tests du moteur (lecture, édition, export)
 node tools/validate-gpx.js fichier.gpx    # validation GPX 1.1 en ligne de commande
 node tools/uitest.js [fichier.gpx]        # test d'interface (Playwright + Chromium)
@@ -121,5 +122,8 @@ Découpage du code :
 | `js/map.js` | carte à tuiles (canvas, sans bibliothèque) |
 | `js/app.js` | interface et enchaînement |
 
-`sample/sample-ride.gpx` est un enregistrement **synthétique** (généré par
-`tools/make-sample.js`) : aucune trace GPS personnelle n'est versionnée dans ce dépôt.
+Les fichiers `sample/sample-ride.gpx` (mise en forme Garmin Connect) et
+`sample/sample-ride-strava.gpx` (mise en forme Strava : préfixe `gpxtpx:`, `<power>` en
+enfant direct de `<extensions>`, deux `<trkseg>`) sont des enregistrements **synthétiques**
+générés par `tools/make-sample.js` : aucune trace GPS personnelle n'est versionnée ici.
+Les tests couvrent aussi le cas minimal (ni altitude ni extensions).

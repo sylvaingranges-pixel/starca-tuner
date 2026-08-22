@@ -93,7 +93,15 @@
     var lastEle = NaN;
     for (var e = 0; e < n; e++) { if (isFinite(ele[e])) lastEle = ele[e]; else ele[e] = lastEle; }
     for (var e2 = n - 1; e2 >= 0; e2--) { if (isFinite(ele[e2])) lastEle = ele[e2]; else ele[e2] = lastEle; }
-    if (!isFinite(ele[0])) ele.fill(0);
+    var hasEle = isFinite(ele[0]);
+    if (!hasEle) ele.fill(0);
+
+    var segOf = new Int32Array(n);
+    if (source.segments && source.segments.length > 1) {
+      for (var sg = 0; sg < source.segments.length; sg++) {
+        for (var sp = source.segments[sg].start; sp <= source.segments[sg].end; sp++) segOf[sp] = sg;
+      }
+    }
 
     var dSeg = new Float64Array(Math.max(0, n - 1));   // metres per interval
     var dtSeg = new Float64Array(Math.max(0, n - 1));  // seconds per interval
@@ -103,7 +111,7 @@
       var dt = t[k + 1] - t[k];
       if (!(dt > 0)) dt = 0;
       dSeg[k] = d; dtSeg[k] = dt;
-      if (dt > pauseGap || dt === 0) gap[k] = 1;
+      if (dt > pauseGap || dt === 0 || segOf[k] !== segOf[k + 1]) gap[k] = 1;
       dist[k + 1] = dist[k] + d;
     }
 
@@ -124,8 +132,8 @@
     for (var s = 0; s < n; s++) speedKmh[s] = vSmooth[s] * 3.6;
 
     channels.push({ key: 'speed', label: 'Vitesse', unit: 'km/h', color: '#38bdf8', decimals: 1, data: speedKmh, derived: true, filterable: true, visible: true });
-    channels.push({ key: 'ele', label: 'Altitude', unit: 'm', color: '#94a3b8', decimals: 0, data: ele, derived: true, filterable: true, visible: true, fill: true });
-    channels.push({ key: 'grade', label: 'Pente', unit: '°', color: '#fbbf24', decimals: 1, data: grade, derived: true, filterable: true, visible: true, zero: true });
+    channels.push({ key: 'ele', label: 'Altitude', unit: 'm', color: '#94a3b8', decimals: 0, data: ele, derived: true, filterable: hasEle, visible: hasEle, fill: true });
+    channels.push({ key: 'grade', label: 'Pente', unit: '°', color: '#fbbf24', decimals: 1, data: grade, derived: true, filterable: hasEle, visible: hasEle, zero: true });
 
     // Extension channels, in file order.
     for (var x = 0; x < source.extOrder.length; x++) {
@@ -160,9 +168,9 @@
     return {
       source: source, n: n, t0Ms: t0,
       lat: lat, lon: lon, ele: ele, eleSmooth: eleSmooth,
-      t: t, dist: dist, dSeg: dSeg, dtSeg: dtSeg, gap: gap,
+      t: t, dist: dist, dSeg: dSeg, dtSeg: dtSeg, gap: gap, segOf: segOf,
       vPoint: vPoint, vSmooth: vSmooth, grade: grade,
-      channels: channels,
+      channels: channels, hasEle: hasEle,
       opts: { speedSmooth: speedSmooth, gradeWindow: gradeWindow, pauseGap: pauseGap },
       stats: {
         duration: t[n - 1], distance: dist[n - 1], movingTime: movingTime, movingDist: movingDist,

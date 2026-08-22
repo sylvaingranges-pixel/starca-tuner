@@ -750,8 +750,11 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
     out.push('    <trkseg>\n');
 
     var millis = source.timeMillis;
+    var curSeg = points.length ? (points[0].seg || 0) : 0;
     for (var i = 0; i < points.length; i++) {
       var p = points[i];
+      var pseg = p.seg || 0;
+      if (pseg !== curSeg) { out.push('    </trkseg>\n    <trkseg>\n'); curSeg = pseg; }
       var latS = p.rawLat !== undefined && p.rawLat !== null ? p.rawLat : trimNum(p.lat, 9);
       var lonS = p.rawLon !== undefined && p.rawLon !== null ? p.rawLon : trimNum(p.lon, 9);
       out.push('      <trkpt lat="' + latS + '" lon="' + lonS + '">\n');
@@ -873,7 +876,15 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
     var lastEle = NaN;
     for (var e = 0; e < n; e++) { if (isFinite(ele[e])) lastEle = ele[e]; else ele[e] = lastEle; }
     for (var e2 = n - 1; e2 >= 0; e2--) { if (isFinite(ele[e2])) lastEle = ele[e2]; else ele[e2] = lastEle; }
-    if (!isFinite(ele[0])) ele.fill(0);
+    var hasEle = isFinite(ele[0]);
+    if (!hasEle) ele.fill(0);
+
+    var segOf = new Int32Array(n);
+    if (source.segments && source.segments.length > 1) {
+      for (var sg = 0; sg < source.segments.length; sg++) {
+        for (var sp = source.segments[sg].start; sp <= source.segments[sg].end; sp++) segOf[sp] = sg;
+      }
+    }
 
     var dSeg = new Float64Array(Math.max(0, n - 1));   // metres per interval
     var dtSeg = new Float64Array(Math.max(0, n - 1));  // seconds per interval
@@ -883,7 +894,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
       var dt = t[k + 1] - t[k];
       if (!(dt > 0)) dt = 0;
       dSeg[k] = d; dtSeg[k] = dt;
-      if (dt > pauseGap || dt === 0) gap[k] = 1;
+      if (dt > pauseGap || dt === 0 || segOf[k] !== segOf[k + 1]) gap[k] = 1;
       dist[k + 1] = dist[k] + d;
     }
 
@@ -904,8 +915,8 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
     for (var s = 0; s < n; s++) speedKmh[s] = vSmooth[s] * 3.6;
 
     channels.push({ key: 'speed', label: 'Vitesse', unit: 'km/h', color: '#38bdf8', decimals: 1, data: speedKmh, derived: true, filterable: true, visible: true });
-    channels.push({ key: 'ele', label: 'Altitude', unit: 'm', color: '#94a3b8', decimals: 0, data: ele, derived: true, filterable: true, visible: true, fill: true });
-    channels.push({ key: 'grade', label: 'Pente', unit: '°', color: '#fbbf24', decimals: 1, data: grade, derived: true, filterable: true, visible: true, zero: true });
+    channels.push({ key: 'ele', label: 'Altitude', unit: 'm', color: '#94a3b8', decimals: 0, data: ele, derived: true, filterable: hasEle, visible: hasEle, fill: true });
+    channels.push({ key: 'grade', label: 'Pente', unit: '°', color: '#fbbf24', decimals: 1, data: grade, derived: true, filterable: hasEle, visible: hasEle, zero: true });
 
     // Extension channels, in file order.
     for (var x = 0; x < source.extOrder.length; x++) {
@@ -940,9 +951,9 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
     return {
       source: source, n: n, t0Ms: t0,
       lat: lat, lon: lon, ele: ele, eleSmooth: eleSmooth,
-      t: t, dist: dist, dSeg: dSeg, dtSeg: dtSeg, gap: gap,
+      t: t, dist: dist, dSeg: dSeg, dtSeg: dtSeg, gap: gap, segOf: segOf,
       vPoint: vPoint, vSmooth: vSmooth, grade: grade,
-      channels: channels,
+      channels: channels, hasEle: hasEle,
       opts: { speedSmooth: speedSmooth, gradeWindow: gradeWindow, pauseGap: pauseGap },
       stats: {
         duration: t[n - 1], distance: dist[n - 1], movingTime: movingTime, movingDist: movingDist,
@@ -1157,7 +1168,9 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
   function alignToWholeSeconds(track, factor) {
     var raw = savedTime(track, factor, 0, factor.length);
     var goal = Math.round(raw);
-    if (Math.abs(raw) < 1e-9 || Math.abs(raw - goal) < 1e-9) return factor;
+    // Nothing to align, already exact, or a gain smaller than a second: leave as is.
+    if (Math.abs(raw) < 1e-9 || goal === 0 || Math.abs(raw - goal) < 1e-9) return factor;
+    var up = raw > 0;                       // saved time grows with the strength
     var lo = 0, hi = 2, best = factor;
     for (var it = 0; it < 80; it++) {
       var a = (lo + hi) / 2;
@@ -1165,7 +1178,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
       for (var i = 0; i < factor.length; i++) f[i] = 1 + (factor[i] - 1) * a;
       var s = savedTime(track, f, 0, f.length);
       best = f;
-      if (s < goal) lo = a; else hi = a;
+      if (up ? s < goal : s > goal) lo = a; else hi = a;
     }
     return best;
   }
@@ -1260,6 +1273,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
         interpolated++;
       }
       p.timeMs = track.t0Ms + Math.round(tau * 1000);
+      p.seg = track.segOf ? track.segOf[j] : 0;
       if (doAdjust) applyEffortAdjust(track, src, f, j, p, powerKey, hrKey, phys, adjust);
       out.push(p);
       return j;
@@ -1278,6 +1292,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
         var shift = start - track.t[a];
         for (var q = a; q <= b; q++) {
           var cp = clonePoint(pts[q]);
+          cp.seg = track.segOf ? track.segOf[q] : 0;
           var tq = track.t[q] + shift;
           cp.timeMs = track.t0Ms + Math.round(tq * 1000);
           out.push(cp);
@@ -1300,6 +1315,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
       // Make sure the last vertex of the run is reached (the pause must start there).
       if (end - (start + (k - 1) * dt) > 0.4 * dt) {
         var extra = clonePoint(pts[b]);
+        extra.seg = track.segOf ? track.segOf[b] : 0;
         var te = start + k * dt;
         extra.timeMs = track.t0Ms + Math.round(te * 1000);
         out.push(extra);
@@ -1342,7 +1358,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
     for (var o in p.other) other[o] = p.other[o];
     return {
       lat: p.lat, lon: p.lon, rawLat: p.rawLat, rawLon: p.rawLon,
-      ele: p.ele, rawEle: p.rawEle, timeMs: p.timeMs, ext: ext, other: other
+      ele: p.ele, rawEle: p.rawEle, timeMs: p.timeMs, seg: p.seg || 0, ext: ext, other: other
     };
   }
 
@@ -2201,7 +2217,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
     }
   }
 
-  TrackMap.prototype.setSource = function (key) { this.source = key; this.tiles.clear(); this.draw(); };
+  TrackMap.prototype.setSource = function (key) { this.source = key; this.tiles.clear(); this.tileErrors = 0; this.draw(); };
   TrackMap.prototype.sources = function () { return SOURCES; };
 
   TrackMap.prototype.setTrack = function (track) {
@@ -2356,7 +2372,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
     img.crossOrigin = 'anonymous';
     var self = this;
     img.onload = function () { self.draw(); };
-    img.onerror = function () { img.failed = true; };
+    img.onerror = function () { img.failed = true; self.tileErrors = (self.tileErrors || 0) + 1; self.draw(); };
     img.src = src.url.replace('{z}', z).replace('{x}', x).replace('{y}', y);
     this.tiles.set(key, img);
     return null;
@@ -2452,6 +2468,17 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
     ctx.font = '10px ui-monospace, monospace';
     ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
     ctx.fillText(barM >= 1000 ? (barM / 1000) + ' km' : barM + ' m', 18, h - 14);
+
+    if (this.tileErrors > 6 && src.url) {
+      var msg = 'Fond de carte indisponible (hors ligne ?) — le tracé reste utilisable.';
+      ctx.font = '11px system-ui, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      var mw = ctx.measureText(msg).width;
+      ctx.fillStyle = 'rgba(11,17,25,0.82)';
+      ctx.fillRect(w / 2 - mw / 2 - 8, 44, mw + 16, 20);
+      ctx.fillStyle = '#f59e0b';
+      ctx.fillText(msg, w / 2, 47);
+    }
 
     if (src.attr) {
       ctx.font = '10px system-ui, sans-serif';
@@ -2569,8 +2596,9 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
     var box = $('chanToggles');
     box.innerHTML = '';
     S.track.channels.forEach(function (ch) {
+      if (ch.visible === false && S.stack) S.stack.setRowVisible(ch.key, false);
       var b = document.createElement('button');
-      b.className = 'chip on';
+      b.className = 'chip' + (ch.visible === false ? '' : ' on');
       b.innerHTML = '<span class="cdot" style="background:' + ch.color + '"></span>' + escapeHtml(ch.label);
       b.addEventListener('click', function () {
         var on = !b.classList.contains('on');

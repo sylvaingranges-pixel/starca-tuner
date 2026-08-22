@@ -45,7 +45,7 @@
     }
   }
 
-  TrackMap.prototype.setSource = function (key) { this.source = key; this.tiles.clear(); this.draw(); };
+  TrackMap.prototype.setSource = function (key) { this.source = key; this.tiles.clear(); this.tileErrors = 0; this.draw(); };
   TrackMap.prototype.sources = function () { return SOURCES; };
 
   TrackMap.prototype.setTrack = function (track) {
@@ -200,7 +200,7 @@
     img.crossOrigin = 'anonymous';
     var self = this;
     img.onload = function () { self.draw(); };
-    img.onerror = function () { img.failed = true; };
+    img.onerror = function () { img.failed = true; self.tileErrors = (self.tileErrors || 0) + 1; self.draw(); };
     img.src = src.url.replace('{z}', z).replace('{x}', x).replace('{y}', y);
     this.tiles.set(key, img);
     return null;
@@ -296,6 +296,17 @@
     ctx.font = '10px ui-monospace, monospace';
     ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
     ctx.fillText(barM >= 1000 ? (barM / 1000) + ' km' : barM + ' m', 18, h - 14);
+
+    if (this.tileErrors > 6 && src.url) {
+      var msg = 'Fond de carte indisponible (hors ligne ?) — le tracé reste utilisable.';
+      ctx.font = '11px system-ui, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      var mw = ctx.measureText(msg).width;
+      ctx.fillStyle = 'rgba(11,17,25,0.82)';
+      ctx.fillRect(w / 2 - mw / 2 - 8, 44, mw + 16, 20);
+      ctx.fillStyle = '#f59e0b';
+      ctx.fillText(msg, w / 2, 47);
+    }
 
     if (src.attr) {
       ctx.font = '10px system-ui, sans-serif';

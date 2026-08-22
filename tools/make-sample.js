@@ -71,3 +71,19 @@ ${pts.join('\n')}
 `;
 fs.writeFileSync(out, gpx);
 console.log('écrit', out, (gpx.length / 1024).toFixed(0), 'ko,', pts.length, 'points');
+
+// Strava-flavoured variant: gpxtpx: prefix, <power> as a direct child of
+// <extensions>, and the ride split into two <trkseg> (a recording pause).
+let sv = gpx
+  .replace('creator="Garmin Connect"', 'creator="StravaGPX"')
+  .replace('xmlns:ns3=', 'xmlns:gpxtpx=').replace('xmlns:ns2=', 'xmlns:gpxx=')
+  .replace(/ns3:/g, 'gpxtpx:')
+  .replace(/\n\s*<gpxtpx:power>\d+<\/gpxtpx:power>/g, '')
+  .replace(/<extensions>\n/g, '<extensions>\n          <power>210</power>\n');
+const chunks = sv.split('      <trkpt');
+const mid = Math.floor(chunks.length / 2);
+chunks[mid] = '    </trkseg>\n    <trkseg>\n      <trkpt' + chunks[mid];
+sv = chunks.join('      <trkpt').replace('      <trkpt    </trkseg>', '    </trkseg>');
+const out2 = path.join(__dirname, '..', 'sample', 'sample-ride-strava.gpx');
+fs.writeFileSync(out2, sv);
+console.log('écrit', out2, (sv.length / 1024).toFixed(0), 'ko, 2 segments');

@@ -191,7 +191,9 @@
   function alignToWholeSeconds(track, factor) {
     var raw = savedTime(track, factor, 0, factor.length);
     var goal = Math.round(raw);
-    if (Math.abs(raw) < 1e-9 || Math.abs(raw - goal) < 1e-9) return factor;
+    // Nothing to align, already exact, or a gain smaller than a second: leave as is.
+    if (Math.abs(raw) < 1e-9 || goal === 0 || Math.abs(raw - goal) < 1e-9) return factor;
+    var up = raw > 0;                       // saved time grows with the strength
     var lo = 0, hi = 2, best = factor;
     for (var it = 0; it < 80; it++) {
       var a = (lo + hi) / 2;
@@ -199,7 +201,7 @@
       for (var i = 0; i < factor.length; i++) f[i] = 1 + (factor[i] - 1) * a;
       var s = savedTime(track, f, 0, f.length);
       best = f;
-      if (s < goal) lo = a; else hi = a;
+      if (up ? s < goal : s > goal) lo = a; else hi = a;
     }
     return best;
   }
@@ -294,6 +296,7 @@
         interpolated++;
       }
       p.timeMs = track.t0Ms + Math.round(tau * 1000);
+      p.seg = track.segOf ? track.segOf[j] : 0;
       if (doAdjust) applyEffortAdjust(track, src, f, j, p, powerKey, hrKey, phys, adjust);
       out.push(p);
       return j;
@@ -312,6 +315,7 @@
         var shift = start - track.t[a];
         for (var q = a; q <= b; q++) {
           var cp = clonePoint(pts[q]);
+          cp.seg = track.segOf ? track.segOf[q] : 0;
           var tq = track.t[q] + shift;
           cp.timeMs = track.t0Ms + Math.round(tq * 1000);
           out.push(cp);
@@ -334,6 +338,7 @@
       // Make sure the last vertex of the run is reached (the pause must start there).
       if (end - (start + (k - 1) * dt) > 0.4 * dt) {
         var extra = clonePoint(pts[b]);
+        extra.seg = track.segOf ? track.segOf[b] : 0;
         var te = start + k * dt;
         extra.timeMs = track.t0Ms + Math.round(te * 1000);
         out.push(extra);
@@ -376,7 +381,7 @@
     for (var o in p.other) other[o] = p.other[o];
     return {
       lat: p.lat, lon: p.lon, rawLat: p.rawLat, rawLon: p.rawLon,
-      ele: p.ele, rawEle: p.rawEle, timeMs: p.timeMs, ext: ext, other: other
+      ele: p.ele, rawEle: p.rawEle, timeMs: p.timeMs, seg: p.seg || 0, ext: ext, other: other
     };
   }
 

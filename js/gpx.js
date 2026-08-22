@@ -221,8 +221,11 @@
     out.push('    <trkseg>\n');
 
     var millis = source.timeMillis;
+    var curSeg = points.length ? (points[0].seg || 0) : 0;
     for (var i = 0; i < points.length; i++) {
       var p = points[i];
+      var pseg = p.seg || 0;
+      if (pseg !== curSeg) { out.push('    </trkseg>\n    <trkseg>\n'); curSeg = pseg; }
       var latS = p.rawLat !== undefined && p.rawLat !== null ? p.rawLat : trimNum(p.lat, 9);
       var lonS = p.rawLon !== undefined && p.rawLon !== null ? p.rawLon : trimNum(p.lon, 9);
       out.push('      <trkpt lat="' + latS + '" lon="' + lonS + '">\n');

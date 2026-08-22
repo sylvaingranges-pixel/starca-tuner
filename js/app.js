@@ -97,8 +97,9 @@
     var box = $('chanToggles');
     box.innerHTML = '';
     S.track.channels.forEach(function (ch) {
+      if (ch.visible === false && S.stack) S.stack.setRowVisible(ch.key, false);
       var b = document.createElement('button');
-      b.className = 'chip on';
+      b.className = 'chip' + (ch.visible === false ? '' : ' on');
       b.innerHTML = '<span class="cdot" style="background:' + ch.color + '"></span>' + escapeHtml(ch.label);
       b.addEventListener('click', function () {
         var on = !b.classList.contains('on');
