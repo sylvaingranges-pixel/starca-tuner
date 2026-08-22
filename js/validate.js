@@ -100,6 +100,9 @@
     if (badTime) errors.push(badTime + ' horodatage(s) hors format ISO-8601 (xsd:dateTime).');
     if (back) errors.push(back + ' horodatage(s) en recul : la chronologie doit être strictement croissante.');
     if (dup) errors.push(dup + ' horodatage(s) dupliqué(s).');
+    var mb = text.length / 1048576;
+    if (mb > 25) errors.push('Fichier de ' + mb.toFixed(1) + ' Mo : au-delà de la limite d\'envoi de Strava (25 Mo).');
+    else if (mb > 20) warnings.push('Fichier de ' + mb.toFixed(1) + ' Mo, proche de la limite de 25 Mo de Strava.');
     if (maxSpeed > 120) warnings.push('Vitesse instantanée maximale de ' + maxSpeed.toFixed(0) + ' km/h : valeur peu plausible pour du vélo.');
 
     info = {

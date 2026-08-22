@@ -1,0 +1,3022 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Starca Tuner — fichier unique, ouvrez-le dans un navigateur. -->
+<title>Starca Tuner — retouche de sorties vélo Garmin</title>
+<style>
+:root {
+  --bg: #070c12;
+  --panel: #0d141c;
+  --panel2: #111b25;
+  --line: #1c2733;
+  --text: #dbe7f3;
+  --dim: #7b8fa3;
+  --accent: #38bdf8;
+  --warm: #f59e0b;
+  --ok: #22c55e;
+  --err: #ef4444;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font: 13px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+h1 { font-size: 22px; margin: 0 0 12px; }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--dim); margin: 0 0 10px; }
+h3 { font-size: 12px; margin: 16px 0 6px; color: var(--text); }
+button, input, select { font: inherit; color: inherit; }
+
+/* ---------- top bar ---------- */
+.topbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.brand { font-weight: 700; letter-spacing: .04em; color: var(--accent); }
+.activity { color: var(--dim); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.activity b { color: var(--text); font-weight: 600; }
+.delta { font-size: 12px; color: var(--warm); white-space: nowrap; }
+.spacer { flex: 1; }
+
+.btn {
+  background: var(--panel2); border: 1px solid var(--line); color: var(--text);
+  padding: 6px 11px; border-radius: 6px; cursor: pointer; white-space: nowrap;
+}
+.btn:hover:not(:disabled) { border-color: #2f4457; background: #16232f; }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.primary { background: #12405a; border-color: #17618a; }
+.btn.accent { background: #1d4ed8; border-color: #2563eb; color: #fff; }
+.btn.accent:hover { background: #2563eb; }
+.btn.ghost { background: transparent; }
+.btn.small { padding: 3px 8px; font-size: 12px; }
+.seg { background: var(--panel2); border: 1px solid var(--line); padding: 3px 10px; cursor: pointer; }
+.seg:first-of-type { border-radius: 6px 0 0 6px; }
+.seg:last-of-type { border-radius: 0 6px 6px 0; border-left: none; }
+.seg.on { background: #12405a; border-color: #17618a; color: #fff; }
+
+/* ---------- layout ---------- */
+.layout { flex: 1; display: flex; min-height: 0; }
+.left { flex: 1; min-width: 320px; display: flex; flex-direction: column; min-height: 0; }
+.right { width: 430px; flex: none; display: flex; flex-direction: column; border-left: 1px solid var(--line); min-height: 0; }
+.splitter { width: 5px; cursor: col-resize; background: var(--line); flex: none; }
+.splitter:hover { background: #2f4457; }
+
+.toolbar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--panel); flex: none;
+}
+.toolbar .grp { display: flex; align-items: center; gap: 6px; }
+.toolbar .lbl { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+.hint { color: #4d6070; font-size: 11px; }
+.chips { display: flex; gap: 4px; flex-wrap: wrap; }
+.chip {
+  border: 1px solid var(--line); background: var(--panel2); color: var(--dim);
+  border-radius: 20px; padding: 2px 9px; font-size: 11px; cursor: pointer;
+}
+.chip.on { color: var(--text); border-color: #2f4457; }
+.chip .cdot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: middle; opacity: .35; }
+.chip.on .cdot { opacity: 1; }
+
+.charts { flex: 1; overflow-y: auto; overflow-x: hidden; padding-bottom: 4px; }
+.empty { padding: 40px; max-width: 620px; color: var(--dim); }
+.empty p { margin: 0 0 12px; }
+.empty b { color: var(--text); }
+.empty .dim { color: #4d6070; font-size: 12px; }
+
+/* ---------- charts ---------- */
+.chart-row { border-bottom: 1px solid #131c25; }
+.chart-head {
+  display: flex; align-items: center; gap: 6px; padding: 3px 8px 3px 10px;
+  font-size: 11px; color: var(--dim); background: #0a1017;
+}
+.chart-head .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.chart-head .lbl { color: var(--text); font-weight: 600; }
+.chart-head .cursor-val { color: var(--accent); font-family: ui-monospace, monospace; min-width: 48px; }
+.chart-head .spacer { flex: 1; }
+.chart-head input[type=number] { width: 58px; background: #0d151d; border: 1px solid var(--line); border-radius: 4px; padding: 1px 4px; font-size: 11px; }
+.chart-head input[type=number]:disabled { opacity: .35; }
+.chart-head .yauto { display: flex; align-items: center; gap: 3px; cursor: pointer; }
+.chart-head .hidebtn { background: none; border: none; color: var(--dim); cursor: pointer; padding: 0 2px; }
+.chart-head .hidebtn:hover { color: var(--err); }
+.chart-row canvas { display: block; width: 100%; height: 108px; cursor: crosshair; touch-action: none; }
+.chart-axis canvas { display: block; width: 100%; height: 18px; }
+.chart-footer-wrap { flex: none; background: var(--panel); border-top: 1px solid var(--line); }
+.chart-overview { border-top: 1px solid var(--line); }
+.chart-overview canvas { display: block; width: 100%; height: 42px; cursor: grab; touch-action: none; }
+
+/* ---------- map ---------- */
+.mapwrap { position: relative; height: 44%; min-height: 220px; flex: none; border-bottom: 1px solid var(--line); }
+#map { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+.mapctl {
+  position: absolute; top: 8px; left: 8px; right: 8px;
+  display: flex; gap: 5px; flex-wrap: wrap; align-items: center;
+}
+.mapctl .btn, .mapctl .sel { backdrop-filter: blur(4px); background: rgba(13,20,28,.82); }
+.mapctl .btn.on { background: #b45309; border-color: var(--warm); color: #fff; }
+.sel { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; font-size: 12px; }
+
+/* ---------- panel ---------- */
+.panel { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.badge { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 0 6px; color: var(--text); }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 12px; }
+.kv span:nth-child(odd) { color: var(--dim); }
+.kv b { font-weight: 600; font-family: ui-monospace, monospace; }
+.dim { color: var(--dim); }
+
+.field { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.field > label { width: 150px; flex: none; color: var(--dim); font-size: 12px; }
+.field .row { display: flex; align-items: center; gap: 5px; flex: 1; }
+.field.checks { flex-direction: column; align-items: flex-start; gap: 3px; }
+.num { width: 74px; background: #0a1119; border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; }
+.u { color: var(--dim); font-size: 11px; }
+.chk { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; }
+.sel { width: 100%; }
+.field .sel { flex: 1; }
+
+.filters { display: flex; flex-direction: column; gap: 3px; }
+.frow { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 2px 0; }
+.frow > label { flex: 1; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.frow .fdot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.frow input[type=number] { width: 60px; background: #0a1119; border: 1px solid var(--line); border-radius: 5px; padding: 2px 5px; font-size: 12px; }
+.frow input[type=number]:disabled { opacity: .3; }
+.frow .rng { color: #46596b; font-size: 10px; width: 92px; text-align: right; font-family: ui-monospace, monospace; }
+
+.adv { margin: 8px 0; border-top: 1px solid var(--line); padding-top: 6px; }
+.adv summary { cursor: pointer; color: var(--dim); font-size: 12px; }
+.preview {
+  margin: 10px 0 8px; padding: 8px 10px; border-radius: 6px;
+  background: #0a1119; border: 1px solid var(--line); font-size: 12px; line-height: 1.6;
+}
+.preview b { font-family: ui-monospace, monospace; color: var(--warm); }
+.preview .warn { color: var(--warm); }
+.actions { display: flex; gap: 8px; align-items: center; }
+
+.editlist { display: flex; flex-direction: column; gap: 6px; }
+.erow { display: flex; align-items: center; gap: 6px; padding: 5px 6px; background: #0a1119; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; }
+.erow.off { opacity: .45; }
+.erow .etxt { flex: 1; min-width: 0; }
+.erow .etxt b { color: var(--warm); font-family: ui-monospace, monospace; }
+.erow .esub { color: var(--dim); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.erow button { background: none; border: none; color: var(--dim); cursor: pointer; padding: 2px 4px; border-radius: 4px; }
+.erow button:hover { color: var(--text); background: var(--panel2); }
+
+/* ---------- modal ---------- */
+.modal { position: fixed; inset: 0; background: rgba(3,7,11,.75); display: flex; align-items: center; justify-content: center; z-index: 50; }
+.modal-box { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; width: min(680px, 92vw); max-height: 86vh; overflow: auto; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.modal .ok { color: var(--ok); }
+.modal .err { color: var(--err); }
+.modal .warn { color: var(--warm); }
+.modal ul { margin: 6px 0; padding-left: 20px; }
+.modal table { border-collapse: collapse; width: 100%; font-size: 12px; margin: 8px 0; }
+.modal td { padding: 3px 6px; border-bottom: 1px solid var(--line); }
+.modal td:first-child { color: var(--dim); }
+.modal td b { font-family: ui-monospace, monospace; }
+kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font-size: 11px; font-family: ui-monospace, monospace; }
+
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">Starca&nbsp;Tuner</div>
+  <label class="btn primary">
+    Ouvrir un GPX…
+    <input type="file" id="file" accept=".gpx,application/gpx+xml" hidden>
+  </label>
+  <div id="activity" class="activity"></div>
+  <div class="spacer"></div>
+  <div id="delta" class="delta"></div>
+  <button id="export" class="btn accent" disabled>Exporter le GPX…</button>
+  <button id="help" class="btn ghost" title="Aide">?</button>
+</header>
+
+<main id="main" class="layout">
+  <section class="left">
+    <div class="toolbar">
+      <span class="grp">
+        <span class="lbl">Axe X</span>
+        <button class="seg on" data-x="time">Temps</button><button class="seg" data-x="dist">Distance</button>
+      </span>
+      <span class="grp">
+        <button id="zoomSel" class="btn small" disabled>Zoom sur la sélection</button>
+        <button id="zoomReset" class="btn small">Vue complète</button>
+        <button id="clearSel" class="btn small" disabled>Effacer la sélection</button>
+      </span>
+      <span class="grp">
+        <span class="lbl">Graphes</span>
+        <span id="chanToggles" class="chips"></span>
+      </span>
+      <span class="spacer"></span>
+      <span class="hint">glisser&nbsp;: sélectionner · molette&nbsp;: zoom · maj+glisser&nbsp;: déplacer · double-clic&nbsp;: vue complète</span>
+    </div>
+    <div id="charts" class="charts"></div>
+    <div id="chartFooter" class="chart-footer-wrap"></div>
+    <div id="empty" class="empty">
+      <h1>Retouche de sorties vélo</h1>
+      <p>Ouvrez un fichier <b>GPX</b> exporté de Garmin Connect ou de Strava&nbsp;: toutes les séries
+         temporelles du fichier s’affichent, synchronisées avec la carte.</p>
+      <p>Sélectionnez un tronçon (dans un graphe ou sur la carte), filtrez les points à retoucher
+         (pente, vitesse, puissance…), fixez le temps à gagner, puis exportez un GPX rejouable dans Strava.</p>
+      <p class="dim">Tout se passe dans votre navigateur&nbsp;: aucun fichier n’est envoyé sur un serveur.
+         Seules les tuiles du fond de carte sont téléchargées.</p>
+    </div>
+  </section>
+
+  <div id="splitter" class="splitter"></div>
+
+  <section class="right">
+    <div class="mapwrap">
+      <canvas id="map"></canvas>
+      <div class="mapctl">
+        <select id="tileSource" class="sel" title="Fond de carte"></select>
+        <button id="mapSelect" class="btn small" title="Sélectionner un tronçon en glissant le long du tracé">Sélection sur la carte</button>
+        <button id="mapFitAll" class="btn small">Tout</button>
+        <button id="mapFitView" class="btn small">Vue</button>
+        <button id="mapFitSel" class="btn small" disabled>Sélection</button>
+      </div>
+    </div>
+
+    <div class="panel" id="panel">
+      <div class="card">
+        <h2>Tronçon sélectionné</h2>
+        <div id="selInfo" class="kv dim">Aucune sélection. Glissez dans un graphe, ou activez «&nbsp;Sélection sur la carte&nbsp;».</div>
+      </div>
+
+      <div class="card" id="editCard" hidden>
+        <h2>Accélérer ce tronçon</h2>
+
+        <div class="field">
+          <label>Consigne</label>
+          <select id="mode" class="sel">
+            <option value="target">Gagner un temps donné sur le tronçon</option>
+            <option value="factor">Multiplier la vitesse par un facteur</option>
+            <option value="delta">Ajouter des km/h</option>
+            <option value="speed">Viser une vitesse minimale</option>
+          </select>
+        </div>
+        <div class="field" id="fTarget">
+          <label>Temps à gagner</label>
+          <div class="row">
+            <input id="targetMin" type="number" min="0" step="1" value="1" class="num"><span class="u">min</span>
+            <input id="targetSec" type="number" min="0" max="59" step="1" value="0" class="num"><span class="u">s</span>
+          </div>
+        </div>
+        <div class="field" id="fFactor" hidden>
+          <label>Facteur de vitesse</label>
+          <div class="row"><span class="u">×</span><input id="factor" type="number" min="0.3" max="3" step="0.01" value="1.10" class="num"></div>
+        </div>
+        <div class="field" id="fDelta" hidden>
+          <label>Supplément de vitesse</label>
+          <div class="row"><span class="u">+</span><input id="delta2" type="number" step="0.5" value="3" class="num"><span class="u">km/h</span></div>
+        </div>
+        <div class="field" id="fSpeed" hidden>
+          <label>Vitesse minimale visée</label>
+          <div class="row"><input id="speedTarget" type="number" step="0.5" value="28" class="num"><span class="u">km/h</span></div>
+        </div>
+
+        <h3>Filtres — quels points accélérer&nbsp;?</h3>
+        <div id="filters" class="filters"></div>
+
+        <details class="adv">
+          <summary>Réglages fins</summary>
+          <div class="field"><label>Vitesse à ne pas dépasser</label>
+            <div class="row"><input id="maxSpeed" type="number" step="1" value="0" class="num"><span class="u">km/h (0 = libre)</span></div></div>
+          <div class="field"><label>Ne pas toucher en dessous de</label>
+            <div class="row"><input id="minSpeed" type="number" step="1" value="5" class="num"><span class="u">km/h</span></div></div>
+          <div class="field"><label>Facteur maximal autorisé</label>
+            <div class="row"><span class="u">×</span><input id="maxFactor" type="number" step="0.1" value="2.5" class="num"></div></div>
+          <div class="field"><label>Transition aux extrémités</label>
+            <div class="row"><input id="ramp" type="number" step="1" value="15" class="num"><span class="u">s</span></div></div>
+          <div class="field"><label>Lissage du facteur</label>
+            <div class="row"><input id="smooth" type="number" step="1" value="10" class="num"><span class="u">s</span></div></div>
+        </details>
+
+        <div id="preview" class="preview"></div>
+        <div class="actions">
+          <button id="apply" class="btn accent">Appliquer au tronçon</button>
+          <button id="resetParams" class="btn ghost small">Valeurs par défaut</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Modifications <span id="editCount" class="badge">0</span></h2>
+        <div id="editList" class="editlist dim">Aucune modification appliquée.</div>
+        <div class="field checks">
+          <label class="chk"><input type="checkbox" id="optAlign" checked> Caler le gain sur la seconde entière</label>
+          <label class="chk"><input type="checkbox" id="optPower"> Recalculer la puissance</label>
+          <label class="chk"><input type="checkbox" id="optHr"> Recalculer la fréquence cardiaque</label>
+        </div>
+        <details class="adv">
+          <summary>Modèle physique (puissance)</summary>
+          <div class="field"><label>Masse totale</label><div class="row"><input id="mass" type="number" step="1" value="83" class="num"><span class="u">kg</span></div></div>
+          <div class="field"><label>SCx (CdA)</label><div class="row"><input id="cda" type="number" step="0.01" value="0.32" class="num"><span class="u">m²</span></div></div>
+          <div class="field"><label>Crr</label><div class="row"><input id="crr" type="number" step="0.001" value="0.005" class="num"></div></div>
+          <div class="field"><label>FC maximale</label><div class="row"><input id="hrMax" type="number" step="1" value="190" class="num"><span class="u">bpm</span></div></div>
+        </details>
+      </div>
+
+      <div class="card">
+        <h2>Réglages d’analyse</h2>
+        <div class="field"><label>Lissage vitesse</label><div class="row"><input id="optSpeedSmooth" type="number" min="1" step="1" value="5" class="num"><span class="u">s</span></div></div>
+        <div class="field"><label>Base de calcul de la pente</label><div class="row"><input id="optGradeWin" type="number" min="5" step="5" value="40" class="num"><span class="u">m</span></div></div>
+        <div class="field"><label>Seuil de pause</label><div class="row"><input id="optPause" type="number" min="2" step="1" value="10" class="num"><span class="u">s</span></div></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-box">
+    <h2 id="modalTitle">Export</h2>
+    <div id="modalBody"></div>
+    <div class="modal-actions">
+      <button id="modalClose" class="btn ghost">Fermer</button>
+      <a id="download" class="btn accent" download>Télécharger le GPX</a>
+    </div>
+  </div>
+</div>
+
+<script>
+/* Minimal, dependency-free XML parser / writer.
+ * Works both in the browser and in Node (used by the CLI test tools).
+ * Only supports what GPX needs: elements, attributes, text, CDATA, comments.
+ */
+(function (global) {
+  'use strict';
+
+  function findTagEnd(s, from) {
+    var q = 0;
+    for (var i = from; i < s.length; i++) {
+      var c = s[i];
+      if (q) { if (c === q) q = 0; }
+      else if (c === '"' || c === "'") q = c;
+      else if (c === '>') return i;
+    }
+    return -1;
+  }
+
+  function decodeEntities(s) {
+    if (s.indexOf('&') < 0) return s;
+    return s.replace(/&(#x?[0-9a-fA-F]+|amp|lt|gt|quot|apos);/g, function (m, e) {
+      switch (e) {
+        case 'amp': return '&';
+        case 'lt': return '<';
+        case 'gt': return '>';
+        case 'quot': return '"';
+        case 'apos': return "'";
+      }
+      if (e[0] === '#') {
+        var code = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+        return isFinite(code) ? String.fromCodePoint(code) : m;
+      }
+      return m;
+    });
+  }
+
+  function encodeEntities(s) {
+    return String(s).replace(/[&<>]/g, function (c) {
+      return c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;';
+    });
+  }
+
+  function encodeAttr(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&quot;';
+    });
+  }
+
+  function parseAttrs(src) {
+    var attrs = [];
+    var re = /([^\s=\/]+)\s*=\s*("([^"]*)"|'([^']*)')/g, m;
+    while ((m = re.exec(src))) {
+      attrs.push({ name: m[1], value: decodeEntities(m[3] !== undefined ? m[3] : m[4]) });
+    }
+    return attrs;
+  }
+
+  /** Parse an XML document into a light tree. Returns the root element. */
+  function parse(text) {
+    if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+    var doc = { name: '#document', attrs: [], children: [], declaration: null };
+    var stack = [doc];
+    var i = 0, len = text.length;
+
+    while (i < len) {
+      var lt = text.indexOf('<', i);
+      if (lt < 0) break;
+      if (lt > i) {
+        var raw = text.slice(i, lt);
+        if (raw.trim()) stack[stack.length - 1].children.push({ name: '#text', text: decodeEntities(raw) });
+      }
+      if (text.startsWith('<?', lt)) {
+        var e1 = text.indexOf('?>', lt);
+        if (e1 < 0) break;
+        doc.declaration = text.slice(lt, e1 + 2);
+        i = e1 + 2; continue;
+      }
+      if (text.startsWith('<!--', lt)) {
+        var e2 = text.indexOf('-->', lt);
+        i = e2 < 0 ? len : e2 + 3; continue;
+      }
+      if (text.startsWith('<![CDATA[', lt)) {
+        var e3 = text.indexOf(']]>', lt);
+        if (e3 < 0) break;
+        stack[stack.length - 1].children.push({ name: '#text', text: text.slice(lt + 9, e3), cdata: true });
+        i = e3 + 3; continue;
+      }
+      if (text.startsWith('<!', lt)) {
+        var e4 = text.indexOf('>', lt);
+        i = e4 < 0 ? len : e4 + 1; continue;
+      }
+      if (text.startsWith('</', lt)) {
+        var e5 = text.indexOf('>', lt);
+        if (stack.length > 1) stack.pop();
+        i = (e5 < 0 ? len : e5 + 1); continue;
+      }
+      var end = findTagEnd(text, lt);
+      if (end < 0) break;
+      var body = text.slice(lt + 1, end);
+      var selfClose = /\/\s*$/.test(body);
+      if (selfClose) body = body.replace(/\/\s*$/, '');
+      var sp = body.search(/[\s\/]/);
+      var name = sp < 0 ? body : body.slice(0, sp);
+      var node = { name: name, attrs: sp < 0 ? [] : parseAttrs(body.slice(sp)), children: [] };
+      stack[stack.length - 1].children.push(node);
+      if (!selfClose) stack.push(node);
+      i = end + 1;
+    }
+
+    var root = null;
+    for (var k = 0; k < doc.children.length; k++) {
+      if (doc.children[k].name !== '#text') { root = doc.children[k]; break; }
+    }
+    if (root) root.declaration = doc.declaration;
+    return root;
+  }
+
+  function attr(node, name) {
+    if (!node) return undefined;
+    for (var i = 0; i < node.attrs.length; i++) if (node.attrs[i].name === name) return node.attrs[i].value;
+    return undefined;
+  }
+
+  function localName(n) {
+    var c = n.indexOf(':');
+    return c < 0 ? n : n.slice(c + 1);
+  }
+
+  function child(node, localOrQName) {
+    if (!node) return null;
+    for (var i = 0; i < node.children.length; i++) {
+      var c = node.children[i];
+      if (c.name === localOrQName || localName(c.name) === localOrQName) return c;
+    }
+    return null;
+  }
+
+  function children(node, localOrQName) {
+    var out = [];
+    if (!node) return out;
+    for (var i = 0; i < node.children.length; i++) {
+      var c = node.children[i];
+      if (c.name === '#text') continue;
+      if (!localOrQName || c.name === localOrQName || localName(c.name) === localOrQName) out.push(c);
+    }
+    return out;
+  }
+
+  function text(node) {
+    if (!node) return '';
+    var s = '';
+    for (var i = 0; i < node.children.length; i++) {
+      var c = node.children[i];
+      if (c.name === '#text') s += c.text;
+      else s += text(c);
+    }
+    return s;
+  }
+
+  /** Serialize a node back to XML with 2-space indentation. */
+  function serialize(node, indent) {
+    indent = indent || '';
+    if (node.name === '#text') return indent + encodeEntities(node.text.trim()) + '\n';
+    var open = '<' + node.name;
+    for (var i = 0; i < node.attrs.length; i++) open += ' ' + node.attrs[i].name + '="' + encodeAttr(node.attrs[i].value) + '"';
+    var kids = node.children.filter(function (c) { return c.name !== '#text' || c.text.trim(); });
+    if (!kids.length) return indent + open + ' />\n';
+    if (kids.length === 1 && kids[0].name === '#text') {
+      return indent + open + '>' + encodeEntities(kids[0].text.trim()) + '</' + node.name + '>\n';
+    }
+    var out = indent + open + '>\n';
+    for (var j = 0; j < kids.length; j++) out += serialize(kids[j], indent + '  ');
+    return out + indent + '</' + node.name + '>\n';
+  }
+
+  global.XMLLite = {
+    parse: parse, attr: attr, child: child, children: children, text: text,
+    serialize: serialize, localName: localName,
+    encodeEntities: encodeEntities, encodeAttr: encodeAttr
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/* GPX reading / writing for Garmin Connect & Strava activity exports.
+ * Extension fields (hr, cad, atemp, power, ...) are discovered generically so
+ * any namespace found in the input is round-tripped to the output.
+ */
+(function (global) {
+  'use strict';
+  var X = global.XMLLite;
+
+  var SKIP_LEAVES = { lat: 1, lon: 1 };
+
+  function isLeaf(node) {
+    for (var i = 0; i < node.children.length; i++) if (node.children[i].name !== '#text') return false;
+    return true;
+  }
+
+  function collectLeaves(node, prefix, out) {
+    for (var i = 0; i < node.children.length; i++) {
+      var c = node.children[i];
+      if (c.name === '#text') continue;
+      var path = prefix.concat([c.name]);
+      if (isLeaf(c)) out.push({ path: path, key: path.join('/'), value: X.text(c).trim() });
+      else collectLeaves(c, path, out);
+    }
+  }
+
+  function parseTimeMs(s) {
+    if (!s) return NaN;
+    var t = Date.parse(s.trim());
+    return isFinite(t) ? t : NaN;
+  }
+
+  /** Parse a GPX activity file. */
+  function parse(text) {
+    var root = X.parse(text);
+    if (!root || X.localName(root.name) !== 'gpx') throw new Error("Ce fichier n'est pas un GPX valide (élément racine <gpx> absent).");
+
+    var trks = X.children(root, 'trk');
+    if (!trks.length) throw new Error('Aucune trace <trk> trouvée dans le fichier.');
+    var trk = trks[0];
+
+    var points = [];
+    var segments = [];
+    var extLeafOrder = [];
+    var extLeafSeen = {};
+    var otherLeafOrder = [];
+    var otherLeafSeen = {};
+    var withMillis = 0, withoutMillis = 0;
+
+    var segs = X.children(trk, 'trkseg');
+    for (var s = 0; s < segs.length; s++) {
+      var start = points.length;
+      var pts = X.children(segs[s], 'trkpt');
+      for (var p = 0; p < pts.length; p++) {
+        var node = pts[p];
+        var latS = X.attr(node, 'lat'), lonS = X.attr(node, 'lon');
+        var lat = parseFloat(latS), lon = parseFloat(lonS);
+        if (!isFinite(lat) || !isFinite(lon)) continue;
+        var timeS = null, eleS = null;
+        var ext = {}, other = {};
+        for (var k = 0; k < node.children.length; k++) {
+          var c = node.children[k];
+          if (c.name === '#text') continue;
+          var ln = X.localName(c.name);
+          if (ln === 'time') { timeS = X.text(c).trim(); continue; }
+          if (ln === 'ele') { eleS = X.text(c).trim(); continue; }
+          if (ln === 'extensions') {
+            var leaves = [];
+            collectLeaves(c, [], leaves);
+            for (var l = 0; l < leaves.length; l++) {
+              var lf = leaves[l];
+              if (SKIP_LEAVES[X.localName(lf.path[lf.path.length - 1])]) continue;
+              ext[lf.key] = lf.value;
+              if (!extLeafSeen[lf.key]) { extLeafSeen[lf.key] = lf.path; extLeafOrder.push(lf.key); }
+            }
+            continue;
+          }
+          if (isLeaf(c)) {
+            other[c.name] = X.text(c).trim();
+            if (!otherLeafSeen[c.name]) { otherLeafSeen[c.name] = true; otherLeafOrder.push(c.name); }
+          }
+        }
+        if (timeS) { if (/\.\d+/.test(timeS)) withMillis++; else withoutMillis++; }
+        points.push({
+          lat: lat, lon: lon, rawLat: latS, rawLon: lonS,
+          ele: eleS === null ? NaN : parseFloat(eleS), rawEle: eleS,
+          timeMs: parseTimeMs(timeS), ext: ext, other: other
+        });
+      }
+      if (points.length > start) segments.push({ start: start, end: points.length - 1 });
+    }
+
+    if (points.length < 2) throw new Error('Le fichier contient moins de deux points de trace.');
+
+    var noTime = points.filter(function (q) { return !isFinite(q.timeMs); }).length;
+    if (noTime) throw new Error('Certains points ne portent pas d\'horodatage (' + noTime + ') : impossible de traiter cette activité.');
+
+    // Points must be chronologically ordered for everything downstream.
+    for (var i = 1; i < points.length; i++) {
+      if (points[i].timeMs < points[i - 1].timeMs) {
+        points.sort(function (a, b) { return a.timeMs - b.timeMs; });
+        segments = [{ start: 0, end: points.length - 1 }];
+        break;
+      }
+    }
+
+    // Integer-valued extension channels are re-emitted as integers.
+    var extMeta = {};
+    for (var e = 0; e < extLeafOrder.length; e++) {
+      var key = extLeafOrder[e];
+      var numeric = true, integer = true, count = 0, decimals = 0;
+      for (var q = 0; q < points.length; q++) {
+        var v = points[q].ext[key];
+        if (v === undefined || v === '') continue;
+        count++;
+        var f = parseFloat(v);
+        if (!isFinite(f) || !/^[-+]?[0-9]*\.?[0-9]+(e[-+]?\d+)?$/i.test(v)) { numeric = false; break; }
+        if (Math.abs(f - Math.round(f)) > 1e-9) integer = false;
+        var dot = v.indexOf('.');
+        if (dot >= 0) decimals = Math.max(decimals, v.length - dot - 1);
+      }
+      extMeta[key] = {
+        key: key, path: extLeafSeen[key], numeric: numeric, integer: numeric && integer && decimals === 0,
+        decimals: Math.min(decimals, 6), count: count,
+        local: X.localName(extLeafSeen[key][extLeafSeen[key].length - 1])
+      };
+    }
+
+    var trkMeta = X.children(trk).filter(function (c) { return X.localName(c.name) !== 'trkseg'; });
+
+    return {
+      declaration: root.declaration || '<?xml version="1.0" encoding="UTF-8"?>',
+      rootAttrs: root.attrs.slice(),
+      creator: X.attr(root, 'creator') || '',
+      metadataNode: X.child(root, 'metadata'),
+      trkAttrs: trk.attrs.slice(),
+      trkMeta: trkMeta,
+      name: X.text(X.child(trk, 'name')).trim() || 'Activité',
+      type: X.text(X.child(trk, 'type')).trim(),
+      points: points,
+      segments: segments,
+      extOrder: extLeafOrder,
+      extMeta: extMeta,
+      otherOrder: otherLeafOrder,
+      timeMillis: withMillis >= withoutMillis
+    };
+  }
+
+  function fmtTime(ms, millis) {
+    var d = new Date(Math.round(ms));
+    var iso = d.toISOString();               // always 'YYYY-MM-DDTHH:MM:SS.mmmZ'
+    return millis ? iso : iso.replace(/\.\d{3}Z$/, 'Z');
+  }
+
+  function trimNum(v, decimals) {
+    var s = v.toFixed(decimals);
+    if (s.indexOf('.') >= 0) s = s.replace(/0+$/, '').replace(/\.$/, '');
+    return s === '-0' ? '0' : s;
+  }
+
+  function buildExtensionsXML(point, source, indent) {
+    // Rebuild the original nesting (e.g. ns3:TrackPointExtension > ns3:hr).
+    var order = source.extOrder, meta = source.extMeta;
+    var lines = [];
+    var openStack = [];
+    var emitted = false;
+    var body = '';
+
+    function closeTo(depth) {
+      while (openStack.length > depth) {
+        var name = openStack.pop();
+        body += indent + '  ' + '  '.repeat(openStack.length) + '</' + name + '>\n';
+      }
+    }
+
+    for (var i = 0; i < order.length; i++) {
+      var key = order[i];
+      var raw = point.ext[key];
+      if (raw === undefined || raw === null || raw === '') continue;
+      var m = meta[key];
+      var path = m.path;
+      // Open/close parent elements as the path changes.
+      var common = 0;
+      while (common < openStack.length && common < path.length - 1 && openStack[common] === path[common]) common++;
+      closeTo(common);
+      for (var d = common; d < path.length - 1; d++) {
+        body += indent + '  ' + '  '.repeat(openStack.length) + '<' + path[d] + '>\n';
+        openStack.push(path[d]);
+      }
+      var value = raw;
+      if (m.numeric) {
+        var f = parseFloat(raw);
+        value = m.integer ? String(Math.round(f)) : f.toFixed(m.decimals || 1);
+        if (!m.integer && m.decimals === 0) value = String(Math.round(f));
+      }
+      body += indent + '  ' + '  '.repeat(openStack.length) + '<' + path[path.length - 1] + '>' +
+        X.encodeEntities(value) + '</' + path[path.length - 1] + '>\n';
+      emitted = true;
+    }
+    closeTo(0);
+    if (!emitted) return '';
+    lines.push(indent + '<extensions>\n' + body + indent + '</extensions>\n');
+    return lines.join('');
+  }
+
+  /** Serialize points back to a GPX document mirroring the input structure. */
+  function build(source, points, options) {
+    options = options || {};
+    var out = [];
+    out.push(source.declaration);
+    out.push('\n<gpx');
+    for (var a = 0; a < source.rootAttrs.length; a++) {
+      out.push((a === 0 ? ' ' : '\n  ') + source.rootAttrs[a].name + '="' + X.encodeAttr(source.rootAttrs[a].value) + '"');
+    }
+    out.push('>\n');
+
+    if (source.metadataNode) out.push(X.serialize(source.metadataNode, '  '));
+    var trkOpen = '  <trk';
+    for (var b = 0; b < source.trkAttrs.length; b++) trkOpen += ' ' + source.trkAttrs[b].name + '="' + X.encodeAttr(source.trkAttrs[b].value) + '"';
+    out.push(trkOpen + '>\n');
+    for (var c = 0; c < source.trkMeta.length; c++) out.push(X.serialize(source.trkMeta[c], '    '));
+    out.push('    <trkseg>\n');
+
+    var millis = source.timeMillis;
+    for (var i = 0; i < points.length; i++) {
+      var p = points[i];
+      var latS = p.rawLat !== undefined && p.rawLat !== null ? p.rawLat : trimNum(p.lat, 9);
+      var lonS = p.rawLon !== undefined && p.rawLon !== null ? p.rawLon : trimNum(p.lon, 9);
+      out.push('      <trkpt lat="' + latS + '" lon="' + lonS + '">\n');
+      if (isFinite(p.ele)) {
+        out.push('        <ele>' + (p.rawEle != null ? p.rawEle : trimNum(p.ele, 2)) + '</ele>\n');
+      }
+      out.push('        <time>' + fmtTime(p.timeMs, millis) + '</time>\n');
+      for (var o = 0; o < source.otherOrder.length; o++) {
+        var on = source.otherOrder[o];
+        if (p.other && p.other[on] !== undefined && p.other[on] !== '') {
+          out.push('        <' + on + '>' + X.encodeEntities(p.other[on]) + '</' + on + '>\n');
+        }
+      }
+      out.push(buildExtensionsXML(p, source, '        '));
+      out.push('      </trkpt>\n');
+    }
+
+    out.push('    </trkseg>\n  </trk>\n</gpx>\n');
+    return out.join('');
+  }
+
+  global.GPX = { parse: parse, build: build, fmtTime: fmtTime, trimNum: trimNum };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/* Turns a parsed GPX into numeric channels: distance, speed, slope, plus every
+ * numeric extension field found in the file (HR, cadence, power, temperature...).
+ */
+(function (global) {
+  'use strict';
+
+  var R_EARTH = 6371008.8;
+  var DEG = Math.PI / 180;
+
+  function haversine(lat1, lon1, lat2, lon2) {
+    var dLat = (lat2 - lat1) * DEG, dLon = (lon2 - lon1) * DEG;
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * DEG) * Math.cos(lat2 * DEG) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 2 * R_EARTH * Math.asin(Math.min(1, Math.sqrt(a)));
+  }
+
+  var EXT_LABELS = {
+    hr: { label: 'Fréquence cardiaque', unit: 'bpm', color: '#ef4444', decimals: 0 },
+    heartrate: { label: 'Fréquence cardiaque', unit: 'bpm', color: '#ef4444', decimals: 0 },
+    cad: { label: 'Cadence', unit: 'tr/min', color: '#22d3ee', decimals: 0 },
+    cadence: { label: 'Cadence', unit: 'tr/min', color: '#22d3ee', decimals: 0 },
+    atemp: { label: 'Température', unit: '°C', color: '#f472b6', decimals: 1 },
+    temp: { label: 'Température', unit: '°C', color: '#f472b6', decimals: 1 },
+    wtemp: { label: 'Température eau', unit: '°C', color: '#38bdf8', decimals: 1 },
+    power: { label: 'Puissance', unit: 'W', color: '#a855f7', decimals: 0 },
+    watts: { label: 'Puissance', unit: 'W', color: '#a855f7', decimals: 0 },
+    PowerInWatts: { label: 'Puissance', unit: 'W', color: '#a855f7', decimals: 0 },
+    speed: { label: 'Vitesse (capteur)', unit: 'm/s', color: '#4ade80', decimals: 2 },
+    distance: { label: 'Distance (capteur)', unit: 'm', color: '#94a3b8', decimals: 0 },
+    course: { label: 'Cap', unit: '°', color: '#94a3b8', decimals: 0 },
+    seaLevelPressure: { label: 'Pression', unit: 'hPa', color: '#94a3b8', decimals: 1 }
+  };
+
+  function movingAverage(src, window) {
+    var n = src.length, out = new Float64Array(n);
+    if (window <= 1) { out.set(src); return out; }
+    var half = Math.floor(window / 2);
+    var sum = 0, count = 0;
+    var head = 0;
+    // Simple O(n) sliding window that ignores NaN.
+    var acc = new Float64Array(n + 1), cnt = new Float64Array(n + 1);
+    for (var i = 0; i < n; i++) {
+      var v = src[i];
+      acc[i + 1] = acc[i] + (isFinite(v) ? v : 0);
+      cnt[i + 1] = cnt[i] + (isFinite(v) ? 1 : 0);
+    }
+    for (var j = 0; j < n; j++) {
+      var a = Math.max(0, j - half), b = Math.min(n, j + half + 1);
+      sum = acc[b] - acc[a]; count = cnt[b] - cnt[a];
+      out[j] = count ? sum / count : NaN;
+    }
+    void head;
+    return out;
+  }
+
+  /** Slope in degrees, computed on a ±window/2 metre distance baseline. */
+  function computeGrade(dist, ele, windowM) {
+    var n = dist.length, out = new Float64Array(n);
+    var half = Math.max(2, windowM / 2);
+    var lo = 0, hi = 0;
+    for (var i = 0; i < n; i++) {
+      while (lo < i && dist[i] - dist[lo] > half) lo++;
+      while (hi < n - 1 && dist[hi] - dist[i] < half) hi++;
+      var run = dist[hi] - dist[lo];
+      if (run < 1) { out[i] = i > 0 ? out[i - 1] : 0; continue; }
+      var rise = ele[hi] - ele[lo];
+      out[i] = Math.atan2(rise, run) / DEG;
+    }
+    return out;
+  }
+
+  /**
+   * @param source parsed GPX
+   * @param opts   {speedSmooth (s), gradeWindow (m), pauseGap (s)}
+   */
+  function build(source, opts) {
+    opts = opts || {};
+    var speedSmooth = opts.speedSmooth != null ? opts.speedSmooth : 5;
+    var gradeWindow = opts.gradeWindow != null ? opts.gradeWindow : 40;
+    var pauseGap = opts.pauseGap != null ? opts.pauseGap : 10;
+
+    var pts = source.points, n = pts.length;
+    var lat = new Float64Array(n), lon = new Float64Array(n), ele = new Float64Array(n);
+    var t = new Float64Array(n), dist = new Float64Array(n);
+    var t0 = pts[0].timeMs;
+
+    for (var i = 0; i < n; i++) {
+      lat[i] = pts[i].lat; lon[i] = pts[i].lon;
+      ele[i] = isFinite(pts[i].ele) ? pts[i].ele : NaN;
+      t[i] = (pts[i].timeMs - t0) / 1000;
+    }
+    // Fill elevation holes so slope stays defined everywhere.
+    var lastEle = NaN;
+    for (var e = 0; e < n; e++) { if (isFinite(ele[e])) lastEle = ele[e]; else ele[e] = lastEle; }
+    for (var e2 = n - 1; e2 >= 0; e2--) { if (isFinite(ele[e2])) lastEle = ele[e2]; else ele[e2] = lastEle; }
+    if (!isFinite(ele[0])) ele.fill(0);
+
+    var dSeg = new Float64Array(Math.max(0, n - 1));   // metres per interval
+    var dtSeg = new Float64Array(Math.max(0, n - 1));  // seconds per interval
+    var gap = new Uint8Array(Math.max(0, n - 1));
+    for (var k = 0; k < n - 1; k++) {
+      var d = haversine(lat[k], lon[k], lat[k + 1], lon[k + 1]);
+      var dt = t[k + 1] - t[k];
+      if (!(dt > 0)) dt = 0;
+      dSeg[k] = d; dtSeg[k] = dt;
+      if (dt > pauseGap || dt === 0) gap[k] = 1;
+      dist[k + 1] = dist[k] + d;
+    }
+
+    // Point speed (m/s) from the two neighbouring intervals.
+    var vPoint = new Float64Array(n);
+    for (var p = 0; p < n; p++) {
+      var dd = 0, ddt = 0;
+      if (p > 0) { dd += dSeg[p - 1]; ddt += dtSeg[p - 1]; }
+      if (p < n - 1) { dd += dSeg[p]; ddt += dtSeg[p]; }
+      vPoint[p] = ddt > 0 ? dd / ddt : 0;
+    }
+    var vSmooth = movingAverage(vPoint, Math.max(1, Math.round(speedSmooth)));
+    var eleSmooth = movingAverage(ele, 9);
+    var grade = computeGrade(dist, eleSmooth, gradeWindow);
+
+    var channels = [];
+    var speedKmh = new Float64Array(n);
+    for (var s = 0; s < n; s++) speedKmh[s] = vSmooth[s] * 3.6;
+
+    channels.push({ key: 'speed', label: 'Vitesse', unit: 'km/h', color: '#38bdf8', decimals: 1, data: speedKmh, derived: true, filterable: true, visible: true });
+    channels.push({ key: 'ele', label: 'Altitude', unit: 'm', color: '#94a3b8', decimals: 0, data: ele, derived: true, filterable: true, visible: true, fill: true });
+    channels.push({ key: 'grade', label: 'Pente', unit: '°', color: '#fbbf24', decimals: 1, data: grade, derived: true, filterable: true, visible: true, zero: true });
+
+    // Extension channels, in file order.
+    for (var x = 0; x < source.extOrder.length; x++) {
+      var key = source.extOrder[x];
+      var meta = source.extMeta[key];
+      if (!meta.numeric || !meta.count) continue;
+      var arr = new Float64Array(n); arr.fill(NaN);
+      var any = false;
+      for (var q = 0; q < n; q++) {
+        var raw = pts[q].ext[key];
+        if (raw === undefined || raw === '') continue;
+        var f = parseFloat(raw);
+        if (isFinite(f)) { arr[q] = f; any = true; }
+      }
+      if (!any) continue;
+      var lbl = EXT_LABELS[meta.local] || { label: meta.local, unit: '', color: '#c084fc', decimals: meta.integer ? 0 : 1 };
+      channels.push({
+        key: 'ext:' + key, extKey: key, label: lbl.label, unit: lbl.unit, color: lbl.color,
+        decimals: lbl.decimals, data: arr, derived: false, filterable: true, visible: true
+      });
+    }
+
+    var vmaxKmh = 0, movingTime = 0, movingDist = 0, elevGain = 0;
+    for (var m = 0; m < n; m++) if (speedKmh[m] > vmaxKmh) vmaxKmh = speedKmh[m];
+    for (var g = 0; g < n - 1; g++) {
+      if (gap[g]) continue;
+      var vi = dtSeg[g] > 0 ? dSeg[g] / dtSeg[g] : 0;
+      if (vi > 0.8) { movingTime += dtSeg[g]; movingDist += dSeg[g]; }
+    }
+    for (var h = 1; h < n; h++) { var de = eleSmooth[h] - eleSmooth[h - 1]; if (de > 0) elevGain += de; }
+
+    return {
+      source: source, n: n, t0Ms: t0,
+      lat: lat, lon: lon, ele: ele, eleSmooth: eleSmooth,
+      t: t, dist: dist, dSeg: dSeg, dtSeg: dtSeg, gap: gap,
+      vPoint: vPoint, vSmooth: vSmooth, grade: grade,
+      channels: channels,
+      opts: { speedSmooth: speedSmooth, gradeWindow: gradeWindow, pauseGap: pauseGap },
+      stats: {
+        duration: t[n - 1], distance: dist[n - 1], movingTime: movingTime, movingDist: movingDist,
+        avgKmh: t[n - 1] > 0 ? dist[n - 1] / t[n - 1] * 3.6 : 0,
+        avgMovingKmh: movingTime > 0 ? movingDist / movingTime * 3.6 : 0,
+        maxKmh: vmaxKmh, elevGain: elevGain,
+        startMs: t0, endMs: pts[n - 1].timeMs
+      }
+    };
+  }
+
+  function channelByKey(track, key) {
+    for (var i = 0; i < track.channels.length; i++) if (track.channels[i].key === key) return track.channels[i];
+    return null;
+  }
+
+  global.Track = { build: build, haversine: haversine, movingAverage: movingAverage, channelByKey: channelByKey };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/* Speed-editing engine.
+ *
+ * Model: the route geometry (the polyline) and the timestamp grid are fixed.
+ * Each edit multiplies the speed of the intervals it selects, which shortens
+ * the time needed to reach every later point. The track is then re-sampled on
+ * the original timestamp grid, so positions stay consistent with the new
+ * speeds while the timestamps remain exactly those of the input file.
+ */
+(function (global) {
+  'use strict';
+
+  var G = 9.80665;
+
+  function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+  function defaultEdit(track, i0, i1) {
+    return {
+      id: 'e' + Math.random().toString(36).slice(2, 8),
+      enabled: true,
+      i0: i0, i1: i1,
+      mode: 'target',            // 'target' | 'factor' | 'delta' | 'speed'
+      targetSec: 60,             // mode 'target': seconds to save on the segment
+      factor: 1.1,               // mode 'factor'
+      deltaKmh: 3,               // mode 'delta'
+      speedKmh: 30,              // mode 'speed'
+      filters: [],               // [{key,min,max}]
+      maxSpeedKmh: 0,            // 0 = no clamp
+      minSpeedKmh: 5,            // never touch intervals slower than this
+      maxFactor: 2.5,
+      rampSec: 15,               // smooth in/out at the segment edges
+      smoothSec: 10              // smooth the factor inside the segment
+    };
+  }
+
+  /** Channel value representative of interval i (between points i and i+1). */
+  function intervalValue(track, key, i) {
+    var ch = null;
+    for (var c = 0; c < track.channels.length; c++) if (track.channels[c].key === key) { ch = track.channels[c]; break; }
+    if (!ch) return NaN;
+    var a = ch.data[i], b = ch.data[i + 1];
+    if (!isFinite(a)) return b;
+    if (!isFinite(b)) return a;
+    return (a + b) / 2;
+  }
+
+  function intervalSpeedKmh(track, i) {
+    return track.dtSeg[i] > 0 ? track.dSeg[i] / track.dtSeg[i] * 3.6 : 0;
+  }
+
+  /** Build the 0..1 weight of each interval for one edit (filters + ramp + smoothing). */
+  function shapeFor(track, edit) {
+    var n = track.n, m = n - 1;
+    var shape = new Float64Array(m);
+    var i0 = clamp(Math.min(edit.i0, edit.i1), 0, n - 1);
+    var i1 = clamp(Math.max(edit.i0, edit.i1), 0, n - 1);
+    var count = 0;
+
+    for (var i = i0; i < i1; i++) {
+      if (track.gap[i]) continue;
+      var v = intervalSpeedKmh(track, i);
+      if (v < (edit.minSpeedKmh || 0)) continue;
+      var ok = true;
+      for (var f = 0; f < edit.filters.length; f++) {
+        var flt = edit.filters[f];
+        if (flt.enabled === false) continue;
+        var val = flt.key === 'speed' ? v : intervalValue(track, flt.key, i);
+        if (!isFinite(val)) { ok = false; break; }
+        if (flt.min != null && val < flt.min) { ok = false; break; }
+        if (flt.max != null && val > flt.max) { ok = false; break; }
+      }
+      if (!ok) continue;
+      shape[i] = 1; count++;
+    }
+
+    // Smooth the mask (in seconds) so the speed change is progressive.
+    if (edit.smoothSec > 0) shape = smoothInRange(track, shape, i0, i1, edit.smoothSec);
+    // Ramp in / out at the segment boundaries.
+    if (edit.rampSec > 0) {
+      var tStart = track.t[i0], tEnd = track.t[i1];
+      for (var j = i0; j < i1; j++) {
+        if (!shape[j]) continue;
+        var tm = (track.t[j] + track.t[j + 1]) / 2;
+        var wIn = clamp((tm - tStart) / edit.rampSec, 0, 1);
+        var wOut = clamp((tEnd - tm) / edit.rampSec, 0, 1);
+        var w = Math.min(wIn, wOut);
+        shape[j] *= 0.5 - 0.5 * Math.cos(Math.PI * w);
+      }
+    }
+    return { shape: shape, count: count, i0: i0, i1: i1 };
+  }
+
+  function smoothInRange(track, shape, i0, i1, seconds) {
+    var out = new Float64Array(shape.length);
+    out.set(shape);
+    var half = seconds / 2;
+    for (var i = i0; i < i1; i++) {
+      var tm = (track.t[i] + track.t[i + 1]) / 2;
+      var sum = 0, wsum = 0;
+      for (var j = i; j >= i0; j--) {
+        var tj = (track.t[j] + track.t[j + 1]) / 2;
+        if (tm - tj > half) break;
+        sum += shape[j]; wsum++;
+      }
+      for (var k = i + 1; k < i1; k++) {
+        var tk = (track.t[k] + track.t[k + 1]) / 2;
+        if (tk - tm > half) break;
+        sum += shape[k]; wsum++;
+      }
+      out[i] = wsum ? sum / wsum : shape[i];
+    }
+    return out;
+  }
+
+  /** Per-interval factor of one edit for a given strength k. */
+  function factorsForStrength(track, edit, shape, i0, i1, k) {
+    var f = new Float64Array(track.n - 1);
+    f.fill(1);
+    var maxV = edit.maxSpeedKmh > 0 ? edit.maxSpeedKmh : Infinity;
+    for (var i = i0; i < i1; i++) {
+      var s = shape[i];
+      if (!s) continue;
+      var v = intervalSpeedKmh(track, i);
+      if (v <= 0) continue;
+      var target;
+      switch (edit.mode) {
+        case 'delta': target = v + s * edit.deltaKmh * k; break;
+        case 'speed': target = v + s * (Math.max(v, edit.speedKmh * k) - v); break;
+        case 'factor': target = v * (1 + s * (edit.factor * k - 1)); break;
+        default: target = v * (1 + s * (k - 1)); break;   // 'target'
+      }
+      if (target > maxV) target = Math.max(v, maxV);
+      var fi = target / v;
+      fi = clamp(fi, 1 / Math.max(1.01, edit.maxFactor), edit.maxFactor);
+      f[i] = fi;
+    }
+    return f;
+  }
+
+  function savedTime(track, f, i0, i1) {
+    var s = 0;
+    for (var i = i0; i < i1; i++) if (f[i] > 0) s += track.dtSeg[i] * (1 - 1 / f[i]);
+    return s;
+  }
+
+  /** Resolve one edit into per-interval factors (solving for the target time saving). */
+  function resolveEdit(track, edit) {
+    var sh = shapeFor(track, edit);
+    var i0 = sh.i0, i1 = sh.i1;
+    var warn = null, k = 1;
+
+    if (edit.mode === 'target') {
+      var goal = edit.targetSec;
+      var lo = goal >= 0 ? 1 : 0.2, hi = goal >= 0 ? edit.maxFactor : 1;
+      var best = factorsForStrength(track, edit, sh.shape, i0, i1, goal >= 0 ? hi : lo);
+      var reach = savedTime(track, best, i0, i1);
+      if ((goal >= 0 && reach < goal - 1e-6) || (goal < 0 && reach > goal + 1e-6)) {
+        warn = 'Objectif non atteignable : ' + fmtDur(Math.abs(reach)) + ' seulement (limite de facteur / vitesse max).';
+        return { factors: best, saved: reach, count: sh.count, i0: i0, i1: i1, warn: warn, k: goal >= 0 ? hi : lo };
+      }
+      for (var it = 0; it < 60; it++) {
+        k = (lo + hi) / 2;
+        var f = factorsForStrength(track, edit, sh.shape, i0, i1, k);
+        var sv = savedTime(track, f, i0, i1);
+        if (sv < goal) lo = k; else hi = k;
+      }
+      var ff = factorsForStrength(track, edit, sh.shape, i0, i1, (lo + hi) / 2);
+      return { factors: ff, saved: savedTime(track, ff, i0, i1), count: sh.count, i0: i0, i1: i1, warn: null, k: (lo + hi) / 2 };
+    }
+
+    var fx = factorsForStrength(track, edit, sh.shape, i0, i1, 1);
+    return { factors: fx, saved: savedTime(track, fx, i0, i1), count: sh.count, i0: i0, i1: i1, warn: null, k: 1 };
+  }
+
+  /** Compose every enabled edit into a single per-interval factor array. */
+  function composeFactors(track, edits) {
+    var m = Math.max(0, track.n - 1);
+    var total = new Float64Array(m); total.fill(1);
+    var perEdit = [];
+    for (var e = 0; e < edits.length; e++) {
+      var ed = edits[e];
+      if (!ed.enabled) { perEdit.push({ id: ed.id, saved: 0, count: 0, warn: null, disabled: true }); continue; }
+      var r = resolveEdit(track, ed);
+      for (var i = r.i0; i < r.i1; i++) total[i] *= r.factors[i];
+      perEdit.push({ id: ed.id, saved: r.saved, count: r.count, warn: r.warn, k: r.k, factors: r.factors, i0: r.i0, i1: r.i1 });
+    }
+    for (var g = 0; g < m; g++) if (track.gap[g]) total[g] = 1;
+    return { factor: total, perEdit: perEdit };
+  }
+
+  /** Scale (factor-1) globally so the total time saved becomes an exact number of seconds. */
+  function alignToWholeSeconds(track, factor) {
+    var raw = savedTime(track, factor, 0, factor.length);
+    var goal = Math.round(raw);
+    if (Math.abs(raw) < 1e-9 || Math.abs(raw - goal) < 1e-9) return factor;
+    var lo = 0, hi = 2, best = factor;
+    for (var it = 0; it < 80; it++) {
+      var a = (lo + hi) / 2;
+      var f = new Float64Array(factor.length);
+      for (var i = 0; i < factor.length; i++) f[i] = 1 + (factor[i] - 1) * a;
+      var s = savedTime(track, f, 0, f.length);
+      best = f;
+      if (s < goal) lo = a; else hi = a;
+    }
+    return best;
+  }
+
+  /** New cumulative time (s) at every original point, under the given factors. */
+  function newTimeline(track, factor) {
+    var n = track.n, T = new Float64Array(n);
+    for (var i = 0; i < n - 1; i++) {
+      var f = factor[i];
+      var dur = (!isFinite(f) || f <= 0 || track.gap[i]) ? track.dtSeg[i] : track.dtSeg[i] / f;
+      T[i + 1] = T[i] + dur;
+    }
+    return T;
+  }
+
+  function powerRequired(vms, gradeDeg, cfg) {
+    if (vms <= 0) return 0;
+    var slope = Math.tan(gradeDeg * Math.PI / 180);
+    var theta = Math.atan(slope);
+    var roll = cfg.mass * G * cfg.crr * Math.cos(theta);
+    var grav = cfg.mass * G * Math.sin(theta);
+    var aero = 0.5 * cfg.rho * cfg.cda * vms * vms;
+    var p = (roll + grav + aero) * vms / cfg.eff;
+    return Math.max(0, p);
+  }
+
+  function lerp(a, b, u) { return a + (b - a) * u; }
+
+  /** Split the ride into runs of continuous recording, separated by pauses/gaps. */
+  function findRuns(track) {
+    var runs = [], a = 0;
+    for (var i = 0; i < track.n - 1; i++) {
+      if (track.gap[i]) { runs.push({ a: a, b: i }); a = i + 1; }
+    }
+    runs.push({ a: a, b: track.n - 1 });
+    return runs.filter(function (r) { return r.b >= r.a; });
+  }
+
+  function medianDt(track, a, b) {
+    var arr = [];
+    for (var i = a; i < b; i++) if (track.dtSeg[i] > 0) arr.push(track.dtSeg[i]);
+    if (!arr.length) return 1;
+    arr.sort(function (x, y) { return x - y; });
+    return arr[Math.floor(arr.length / 2)];
+  }
+
+  /**
+   * Re-sample the track with the new speeds.
+   *
+   * The recording cadence (1 Hz on a Garmin Edge) and the recording pauses are
+   * preserved, and every timestamp stays on the original whole-second grid.
+   * Everything before the first edit keeps its exact original timestamps; what
+   * follows is shifted earlier by the (whole number of seconds) saved.
+   *
+   * Returns { points, factor, timeline, stats }.
+   */
+  function rebuild(track, factor, options) {
+    options = options || {};
+    var align = options.align !== false;
+    var f = align ? alignToWholeSeconds(track, factor) : factor;
+    var T = newTimeline(track, f);
+    var n = track.n, src = track.source, pts = src.points;
+
+    var adjust = options.adjust || {};
+    var phys = { mass: adjust.mass || 83, cda: adjust.cda || 0.32, crr: adjust.crr || 0.005, rho: adjust.rho || 1.2, eff: 0.97 };
+    var powerKey = null, hrKey = null;
+    for (var c = 0; c < track.channels.length; c++) {
+      var ch = track.channels[c];
+      if (!ch.extKey) continue;
+      var loc = src.extMeta[ch.extKey].local.toLowerCase();
+      if (!powerKey && (loc === 'power' || loc === 'watts' || loc === 'powerinwatts')) powerKey = ch.extKey;
+      if (!hrKey && (loc === 'hr' || loc === 'heartrate')) hrKey = ch.extKey;
+    }
+    var doAdjust = (adjust.power && powerKey) || (adjust.hr && hrKey);
+
+    var runs = findRuns(track);
+    var out = [];
+    var interpolated = 0;
+    var EPS = 1e-6;
+    var lastTau = -Infinity;
+
+    function emitAt(tau, j0) {
+      var j = j0;
+      while (j < n - 2 && T[j + 1] < tau - EPS) j++;
+      var p;
+      if (Math.abs(tau - T[j]) < EPS) p = clonePoint(pts[j]);
+      else if (Math.abs(tau - T[j + 1]) < EPS) p = clonePoint(pts[j + 1]);
+      else {
+        var span = T[j + 1] - T[j];
+        var u = span > 0 ? clamp((tau - T[j]) / span, 0, 1) : 0;
+        p = interpolatePoint(src, track, j, u);
+        interpolated++;
+      }
+      p.timeMs = track.t0Ms + Math.round(tau * 1000);
+      if (doAdjust) applyEffortAdjust(track, src, f, j, p, powerKey, hrKey, phys, adjust);
+      out.push(p);
+      return j;
+    }
+
+    for (var r = 0; r < runs.length; r++) {
+      var a = runs[r].a, b = runs[r].b;
+      var start = Math.round(T[a]);
+      if (start <= lastTau) start = lastTau + 1;
+
+      var modified = false;
+      for (var m = a; m < b; m++) if (Math.abs(f[m] - 1) > 1e-9) { modified = true; break; }
+
+      if (!modified) {
+        // Untouched stretch: copy the original samples verbatim, just shifted.
+        var shift = start - track.t[a];
+        for (var q = a; q <= b; q++) {
+          var cp = clonePoint(pts[q]);
+          var tq = track.t[q] + shift;
+          cp.timeMs = track.t0Ms + Math.round(tq * 1000);
+          out.push(cp);
+          lastTau = tq;
+        }
+        continue;
+      }
+
+      var dt = medianDt(track, a, b);
+      var end = T[b];
+      var j = a, k = 0, tau = start;
+      var guard = Math.ceil((end - T[a]) / dt) + 8;
+      while (k <= guard) {
+        tau = start + k * dt;
+        if (tau > T[a] + (end - T[a]) + EPS) break;
+        j = emitAt(Math.min(tau, end), j);
+        lastTau = tau;
+        k++;
+      }
+      // Make sure the last vertex of the run is reached (the pause must start there).
+      if (end - (start + (k - 1) * dt) > 0.4 * dt) {
+        var extra = clonePoint(pts[b]);
+        var te = start + k * dt;
+        extra.timeMs = track.t0Ms + Math.round(te * 1000);
+        out.push(extra);
+        lastTau = te;
+      }
+    }
+
+    // Drop any non-increasing timestamp (defensive; can only happen on odd inputs).
+    var clean = [];
+    for (var z = 0; z < out.length; z++) {
+      if (clean.length && out[z].timeMs <= clean[clean.length - 1].timeMs) continue;
+      clean.push(out[z]);
+    }
+    out = clean;
+
+    var newDuration = out.length ? (out[out.length - 1].timeMs - out[0].timeMs) / 1000 : 0;
+    var savedSec = track.t[n - 1] - newDuration;
+    return {
+      points: out,
+      factor: f,
+      timeline: T,
+      runs: runs,
+      stats: {
+        savedSec: savedSec,
+        newDuration: newDuration,
+        oldDuration: track.t[n - 1],
+        pointsOut: out.length,
+        pointsIn: n,
+        interpolated: interpolated,
+        distance: track.dist[n - 1],
+        newAvgKmh: newDuration > 0 ? track.dist[n - 1] / newDuration * 3.6 : 0
+      }
+    };
+  }
+
+  function clonePoint(p) {
+    var ext = {};
+    for (var key in p.ext) ext[key] = p.ext[key];
+    var other = {};
+    for (var o in p.other) other[o] = p.other[o];
+    return {
+      lat: p.lat, lon: p.lon, rawLat: p.rawLat, rawLon: p.rawLon,
+      ele: p.ele, rawEle: p.rawEle, timeMs: p.timeMs, ext: ext, other: other
+    };
+  }
+
+  function interpolatePoint(src, track, j, u) {
+    var a = src.points[j], b = src.points[j + 1];
+    var ext = {};
+    for (var key in a.ext) {
+      var va = a.ext[key], vb = b.ext[key];
+      var meta = src.extMeta[key];
+      if (meta && meta.numeric) {
+        var fa = parseFloat(va), fb = vb !== undefined ? parseFloat(vb) : NaN;
+        if (isFinite(fa) && isFinite(fb)) ext[key] = String(lerp(fa, fb, u));
+        else if (isFinite(fa)) ext[key] = String(fa);
+        else if (isFinite(fb)) ext[key] = String(fb);
+      } else {
+        ext[key] = u < 0.5 ? va : (vb !== undefined ? vb : va);
+      }
+    }
+    for (var key2 in b.ext) if (ext[key2] === undefined) ext[key2] = b.ext[key2];
+    var other = {};
+    var srcOther = u < 0.5 ? a.other : b.other;
+    for (var o in srcOther) other[o] = srcOther[o];
+    return {
+      lat: lerp(a.lat, b.lat, u), lon: lerp(a.lon, b.lon, u),
+      rawLat: null, rawLon: null,
+      ele: lerp(isFinite(a.ele) ? a.ele : b.ele, isFinite(b.ele) ? b.ele : a.ele, u), rawEle: null,
+      timeMs: 0, ext: ext, other: other
+    };
+  }
+
+  function applyEffortAdjust(track, src, factor, j, p, powerKey, hrKey, phys, adjust) {
+    var f = factor[Math.min(j, factor.length - 1)];
+    if (!isFinite(f) || Math.abs(f - 1) < 1e-6) return;
+    var v = track.vSmooth[j];
+    if (!(v > 1)) return;
+    var grade = track.grade[j];
+    var p0 = powerRequired(v, grade, phys);
+    var p1 = powerRequired(v * f, grade, phys);
+    if (!(p0 > 1)) return;
+    var ratio = p1 / p0;
+    if (adjust.power && powerKey && p.ext[powerKey] !== undefined) {
+      var pw = parseFloat(p.ext[powerKey]);
+      if (isFinite(pw)) p.ext[powerKey] = String(Math.max(0, pw * ratio));
+    }
+    if (adjust.hr && hrKey && p.ext[hrKey] !== undefined) {
+      var hr = parseFloat(p.ext[hrKey]);
+      if (isFinite(hr)) {
+        var hrMax = adjust.hrMax || 190;
+        p.ext[hrKey] = String(clamp(hr * Math.pow(ratio, 0.35), 35, hrMax));
+      }
+    }
+  }
+
+  function fmtDur(sec) {
+    sec = Math.round(Math.abs(sec));
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    return (h ? h + 'h' + String(m).padStart(2, '0') : m + 'min') + (h ? '' : String(s).padStart(2, '0') + 's');
+  }
+
+  global.Edits = {
+    defaultEdit: defaultEdit,
+    composeFactors: composeFactors,
+    resolveEdit: resolveEdit,
+    rebuild: rebuild,
+    findRuns: findRuns,
+    newTimeline: newTimeline,
+    savedTime: savedTime,
+    alignToWholeSeconds: alignToWholeSeconds,
+    intervalSpeedKmh: intervalSpeedKmh,
+    intervalValue: intervalValue,
+    powerRequired: powerRequired,
+    fmtDur: fmtDur
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/* Structural validation of a generated GPX against the GPX 1.1 content model
+ * plus the practical expectations of the Strava importer.
+ */
+(function (global) {
+  'use strict';
+  var X = global.XMLLite;
+
+  var GPX_NS = 'http://www.topografix.com/GPX/1/1';
+  var TRKPT_ORDER = ['ele', 'time', 'magvar', 'geoidheight', 'name', 'cmt', 'desc', 'src', 'link',
+    'sym', 'type', 'fix', 'sat', 'hdop', 'vdop', 'pdop', 'ageofdgpsdata', 'dgpsid', 'extensions'];
+  var TRK_ORDER = ['name', 'cmt', 'desc', 'src', 'link', 'number', 'type', 'extensions', 'trkseg'];
+  var GPX_ORDER = ['metadata', 'wpt', 'rte', 'trk', 'extensions'];
+  var DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[-+]\d{2}:\d{2})$/;
+
+  function checkOrder(node, order, label, errors) {
+    var last = -1;
+    var kids = X.children(node);
+    for (var i = 0; i < kids.length; i++) {
+      var ln = X.localName(kids[i].name);
+      var idx = order.indexOf(ln);
+      if (idx < 0) continue;               // foreign / extension elements are ignored
+      if (idx < last) {
+        errors.push(label + ' : <' + ln + '> apparaît après <' + order[last] + '> (ordre imposé par le schéma GPX 1.1).');
+        return;
+      }
+      last = idx;
+    }
+  }
+
+  function validate(text) {
+    var errors = [], warnings = [], info = {};
+    var root;
+    try { root = X.parse(text); } catch (e) { return { ok: false, errors: ['XML illisible : ' + e.message], warnings: [], info: info }; }
+    if (!root || X.localName(root.name) !== 'gpx') return { ok: false, errors: ['Élément racine <gpx> absent.'], warnings: warnings, info: info };
+
+    if (X.attr(root, 'version') !== '1.1') errors.push('L\'attribut version de <gpx> doit valoir "1.1".');
+    if (!X.attr(root, 'creator')) errors.push('L\'attribut creator de <gpx> est obligatoire.');
+    if (X.attr(root, 'xmlns') !== GPX_NS) errors.push('L\'espace de noms par défaut doit être ' + GPX_NS + '.');
+
+    // every prefix used must be declared on the root
+    var declared = {};
+    for (var a = 0; a < root.attrs.length; a++) {
+      var an = root.attrs[a].name;
+      if (an.indexOf('xmlns:') === 0) declared[an.slice(6)] = true;
+    }
+    declared.xml = true;
+    var undeclared = {};
+    (function walk(node) {
+      var c = node.name.indexOf(':');
+      if (c > 0 && !declared[node.name.slice(0, c)]) undeclared[node.name.slice(0, c)] = true;
+      for (var i = 0; i < node.children.length; i++) if (node.children[i].name !== '#text') walk(node.children[i]);
+    })(root);
+    for (var p in undeclared) errors.push('Préfixe d\'espace de noms non déclaré : ' + p + ':');
+
+    checkOrder(root, GPX_ORDER, '<gpx>', errors);
+
+    var trks = X.children(root, 'trk');
+    if (!trks.length) errors.push('Aucune trace <trk> : Strava refusera le fichier.');
+
+    var total = 0, prevMs = -Infinity, dup = 0, back = 0, badTime = 0, badCoord = 0, noTime = 0;
+    var first = null, last = null, maxSpeed = 0, prevPt = null, dist = 0;
+
+    for (var t = 0; t < trks.length; t++) {
+      checkOrder(trks[t], TRK_ORDER, '<trk>', errors);
+      var segs = X.children(trks[t], 'trkseg');
+      for (var s = 0; s < segs.length; s++) {
+        var pts = X.children(segs[s], 'trkpt');
+        for (var i = 0; i < pts.length; i++) {
+          var pt = pts[i];
+          total++;
+          if (total <= 50000) checkOrder(pt, TRKPT_ORDER, '<trkpt> #' + total, errors);
+          var lat = parseFloat(X.attr(pt, 'lat')), lon = parseFloat(X.attr(pt, 'lon'));
+          if (!isFinite(lat) || !isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) badCoord++;
+          var tn = X.child(pt, 'time');
+          if (!tn) { noTime++; continue; }
+          var ts = X.text(tn).trim();
+          if (!DATETIME.test(ts)) { badTime++; continue; }
+          var ms = Date.parse(ts);
+          if (!isFinite(ms)) { badTime++; continue; }
+          if (ms === prevMs) dup++;
+          else if (ms < prevMs) back++;
+          if (first === null) first = ms;
+          last = ms;
+          if (prevPt && ms > prevMs) {
+            var d = haversine(prevPt[0], prevPt[1], lat, lon);
+            dist += d;
+            var v = d / ((ms - prevMs) / 1000) * 3.6;
+            if (v > maxSpeed) maxSpeed = v;
+          }
+          prevMs = ms; prevPt = [lat, lon];
+          var en = X.child(pt, 'ele');
+          if (en && !isFinite(parseFloat(X.text(en)))) errors.push('<ele> non numérique au point ' + total + '.');
+        }
+      }
+    }
+
+    if (total < 2) errors.push('Moins de deux points de trace.');
+    if (badCoord) errors.push(badCoord + ' point(s) avec des coordonnées invalides.');
+    if (noTime) errors.push(noTime + ' point(s) sans <time> : Strava importerait le fichier comme un simple itinéraire, sans données de temps.');
+    if (badTime) errors.push(badTime + ' horodatage(s) hors format ISO-8601 (xsd:dateTime).');
+    if (back) errors.push(back + ' horodatage(s) en recul : la chronologie doit être strictement croissante.');
+    if (dup) errors.push(dup + ' horodatage(s) dupliqué(s).');
+    var mb = text.length / 1048576;
+    if (mb > 25) errors.push('Fichier de ' + mb.toFixed(1) + ' Mo : au-delà de la limite d\'envoi de Strava (25 Mo).');
+    else if (mb > 20) warnings.push('Fichier de ' + mb.toFixed(1) + ' Mo, proche de la limite de 25 Mo de Strava.');
+    if (maxSpeed > 120) warnings.push('Vitesse instantanée maximale de ' + maxSpeed.toFixed(0) + ' km/h : valeur peu plausible pour du vélo.');
+
+    info = {
+      points: total,
+      start: first ? new Date(first).toISOString() : null,
+      end: last ? new Date(last).toISOString() : null,
+      durationSec: first && last ? (last - first) / 1000 : 0,
+      distanceM: dist,
+      maxSpeedKmh: maxSpeed
+    };
+    return { ok: errors.length === 0, errors: errors, warnings: warnings, info: info };
+  }
+
+  function haversine(lat1, lon1, lat2, lon2) {
+    var DEG = Math.PI / 180, R = 6371008.8;
+    var dLat = (lat2 - lat1) * DEG, dLon = (lon2 - lon1) * DEG;
+    var x = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * DEG) * Math.cos(lat2 * DEG) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(x)));
+  }
+
+  global.GPXValidate = { validate: validate };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/* Synchronised time-series stack drawn on canvases.
+ * All rows share the same X window; each row has its own Y scaling (auto on the
+ * visible window, or a manual min/max).
+ */
+(function (global) {
+  'use strict';
+
+  var GUTTER = 56;
+
+  function niceTicks(min, max, count) {
+    if (!isFinite(min) || !isFinite(max) || min === max) { min = min - 1; max = max + 1; }
+    var span = max - min;
+    var step = Math.pow(10, Math.floor(Math.log10(span / count)));
+    var err = span / count / step;
+    if (err >= 7.5) step *= 10; else if (err >= 3.5) step *= 5; else if (err >= 1.5) step *= 2;
+    var out = [];
+    for (var v = Math.ceil(min / step) * step; v <= max + step * 1e-6; v += step) out.push(Math.abs(v) < step / 1e6 ? 0 : v);
+    return out;
+  }
+
+  function fmtClock(sec) {
+    sec = Math.max(0, Math.round(sec));
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    return h ? h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0')
+      : m + ':' + String(s).padStart(2, '0');
+  }
+
+  function ChartStack(container, opts) {
+    this.el = container;
+    this.footEl = (opts && opts.footer) || container;
+    this.opts = opts || {};
+    this.track = null;
+    this.xMode = 'time';
+    this.rows = [];
+    this.view = [0, 1];
+    this.selection = null;
+    this.hoverX = null;
+    this.overlays = {};
+    this.rowHeight = 108;
+    this._raf = null;
+    this._drag = null;
+    var self = this;
+    if (global.ResizeObserver) {
+      this._ro = new ResizeObserver(function () { self.resize(); });
+      this._ro.observe(container);
+    } else {
+      global.addEventListener('resize', function () { self.resize(); });
+    }
+  }
+
+  ChartStack.prototype.setTrack = function (track) {
+    this.track = track;
+    this.rows = [];
+    this.overlays = {};
+    this.selection = null;
+    var self = this;
+    this.el.innerHTML = '';
+    track.channels.forEach(function (ch) {
+      self.rows.push({
+        ch: ch, visible: ch.visible !== false, yMode: 'auto', yMin: null, yMax: null,
+        el: null, canvas: null, ctx: null
+      });
+    });
+    this._buildDom();
+    this.view = [0, this.xMax()];
+    this.resize();
+  };
+
+  ChartStack.prototype.xArray = function () { return this.xMode === 'dist' ? this.track.dist : this.track.t; };
+  ChartStack.prototype.xMax = function () { var a = this.xArray(); return a[a.length - 1]; };
+  ChartStack.prototype.fmtX = function (v) {
+    return this.xMode === 'dist' ? (v / 1000).toFixed(v < 10000 ? 2 : 1) + ' km' : fmtClock(v);
+  };
+
+  /** Index of the sample at (or just before) x. */
+  ChartStack.prototype.idxAt = function (x) {
+    var a = this.xArray(), lo = 0, hi = a.length - 1;
+    if (x <= a[0]) return 0;
+    if (x >= a[hi]) return hi;
+    while (lo < hi - 1) { var m = (lo + hi) >> 1; if (a[m] <= x) lo = m; else hi = m; }
+    return lo;
+  };
+
+  ChartStack.prototype._buildDom = function () {
+    var self = this;
+    this.rows.forEach(function (row) {
+      var wrap = document.createElement('div');
+      wrap.className = 'chart-row';
+      wrap.dataset.key = row.ch.key;
+      wrap.innerHTML =
+        '<div class="chart-head">' +
+        '<span class="dot" style="background:' + row.ch.color + '"></span>' +
+        '<span class="lbl">' + row.ch.label + '</span>' +
+        '<span class="unit">' + (row.ch.unit ? '(' + row.ch.unit + ')' : '') + '</span>' +
+        '<span class="cursor-val"></span>' +
+        '<span class="spacer"></span>' +
+        '<label class="yauto"><input type="checkbox" checked> auto Y</label>' +
+        '<input class="ymin" type="number" step="any" placeholder="min" disabled>' +
+        '<input class="ymax" type="number" step="any" placeholder="max" disabled>' +
+        '<button class="hidebtn" title="Masquer ce graphe">✕</button>' +
+        '</div>' +
+        '<canvas></canvas>';
+      self.el.appendChild(wrap);
+      row.el = wrap;
+      row.canvas = wrap.querySelector('canvas');
+      row.ctx = row.canvas.getContext('2d');
+      row.valEl = wrap.querySelector('.cursor-val');
+      var auto = wrap.querySelector('.yauto input'), ymin = wrap.querySelector('.ymin'), ymax = wrap.querySelector('.ymax');
+      auto.addEventListener('change', function () {
+        row.yMode = auto.checked ? 'auto' : 'fixed';
+        ymin.disabled = ymax.disabled = auto.checked;
+        if (!auto.checked) {
+          var r = self._yRange(row);
+          if (ymin.value === '') ymin.value = r[0].toFixed(row.ch.decimals);
+          if (ymax.value === '') ymax.value = r[1].toFixed(row.ch.decimals);
+          row.yMin = parseFloat(ymin.value); row.yMax = parseFloat(ymax.value);
+        }
+        self.draw();
+      });
+      function onY() {
+        row.yMin = ymin.value === '' ? null : parseFloat(ymin.value);
+        row.yMax = ymax.value === '' ? null : parseFloat(ymax.value);
+        self.draw();
+      }
+      ymin.addEventListener('input', onY);
+      ymax.addEventListener('input', onY);
+      wrap.querySelector('.hidebtn').addEventListener('click', function () {
+        row.visible = false; wrap.style.display = 'none';
+        if (self.opts.onRowsChanged) self.opts.onRowsChanged();
+      });
+      self._bindCanvas(row.canvas);
+    });
+
+    this.footEl.innerHTML = '';
+    var axis = document.createElement('div');
+    axis.className = 'chart-axis';
+    axis.innerHTML = '<canvas></canvas>';
+    this.footEl.appendChild(axis);
+    this.axisCanvas = axis.querySelector('canvas');
+    this.axisCtx = this.axisCanvas.getContext('2d');
+    this._bindCanvas(this.axisCanvas);
+
+    var ov = document.createElement('div');
+    ov.className = 'chart-overview';
+    ov.innerHTML = '<canvas></canvas>';
+    this.footEl.appendChild(ov);
+    this.ovCanvas = ov.querySelector('canvas');
+    this.ovCtx = this.ovCanvas.getContext('2d');
+    this._bindOverview(this.ovCanvas);
+  };
+
+  ChartStack.prototype.setRowVisible = function (key, vis) {
+    var row = this.rows.find(function (r) { return r.ch.key === key; });
+    if (!row) return;
+    row.visible = vis;
+    row.el.style.display = vis ? '' : 'none';
+    this.resize();
+  };
+
+  ChartStack.prototype.plotWidth = function (canvas) { return canvas.clientWidth - GUTTER - 8; };
+
+  ChartStack.prototype.xToPix = function (x, canvas) {
+    var w = this.plotWidth(canvas);
+    return GUTTER + (x - this.view[0]) / (this.view[1] - this.view[0]) * w;
+  };
+  ChartStack.prototype.pixToX = function (px, canvas) {
+    var w = this.plotWidth(canvas);
+    return this.view[0] + (px - GUTTER) / w * (this.view[1] - this.view[0]);
+  };
+
+  ChartStack.prototype._bindCanvas = function (canvas) {
+    var self = this;
+    canvas.addEventListener('wheel', function (ev) {
+      ev.preventDefault();
+      var x = self.pixToX(ev.offsetX, canvas);
+      var k = Math.pow(1.0015, ev.deltaY);
+      self.zoomAround(x, k);
+    }, { passive: false });
+
+    canvas.addEventListener('pointerdown', function (ev) {
+      if (ev.button === 2) return;
+      canvas.setPointerCapture(ev.pointerId);
+      var pan = ev.shiftKey || ev.button === 1;
+      self._drag = { canvas: canvas, pan: pan, startPx: ev.offsetX, startX: self.pixToX(ev.offsetX, canvas), moved: false };
+      if (!pan) { self.selection = null; self.draw(); }
+    });
+    canvas.addEventListener('pointermove', function (ev) {
+      var x = self.pixToX(ev.offsetX, canvas);
+      if (self._drag && self._drag.canvas === canvas) {
+        var d = self._drag;
+        if (Math.abs(ev.offsetX - d.startPx) > 2) d.moved = true;
+        if (d.pan) {
+          var dx = (d.startX - x);
+          self.setView([self.view[0] + dx, self.view[1] + dx]);
+        } else if (d.moved) {
+          self.setSelection([Math.min(d.startX, x), Math.max(d.startX, x)], true);
+        }
+      }
+      self.setHover(x);
+    });
+    function endDrag(ev) {
+      if (self._drag && self._drag.canvas === canvas) {
+        var d = self._drag;
+        self._drag = null;
+        if (!d.moved && !d.pan) { self.setSelection(null, true); }
+        else if (!d.pan && self.opts.onSelectEnd) self.opts.onSelectEnd(self.selection);
+      }
+    }
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('pointerleave', function () { self.setHover(null); });
+    canvas.addEventListener('dblclick', function () { self.resetView(); });
+    canvas.addEventListener('contextmenu', function (ev) { ev.preventDefault(); self.resetView(); });
+  };
+
+  ChartStack.prototype._bindOverview = function (canvas) {
+    var self = this;
+    function xOf(px) {
+      var w = self.plotWidth(canvas);
+      return Math.max(0, Math.min(self.xMax(), (px - GUTTER) / w * self.xMax()));
+    }
+    var drag = null;
+    canvas.addEventListener('pointerdown', function (ev) {
+      canvas.setPointerCapture(ev.pointerId);
+      var x = xOf(ev.offsetX);
+      var span = self.view[1] - self.view[0];
+      drag = { x: x, span: span };
+      self.setView([x - span / 2, x + span / 2]);
+    });
+    canvas.addEventListener('pointermove', function (ev) {
+      if (!drag) return;
+      var x = xOf(ev.offsetX);
+      self.setView([x - drag.span / 2, x + drag.span / 2]);
+    });
+    canvas.addEventListener('pointerup', function () { drag = null; });
+    canvas.addEventListener('dblclick', function () { self.resetView(); });
+  };
+
+  ChartStack.prototype.setXMode = function (mode) {
+    if (!this.track || mode === this.xMode) return;
+    var a0 = this.xArray();
+    var i0 = this.idxAt(this.view[0]), i1 = this.idxAt(this.view[1]);
+    var s = this.selection ? [this.idxAt(this.selection[0]), this.idxAt(this.selection[1])] : null;
+    void a0;
+    this.xMode = mode;
+    var b = this.xArray();
+    this.view = [b[i0], b[Math.min(b.length - 1, i1)]];
+    if (s) this.selection = [b[s[0]], b[Math.min(b.length - 1, s[1])]];
+    this.draw();
+    if (this.opts.onView) this.opts.onView(this.viewIndices());
+  };
+
+  ChartStack.prototype.zoomAround = function (x, k) {
+    var v = this.view, span = (v[1] - v[0]) * k;
+    var min = this.xMode === 'dist' ? 20 : 5;
+    span = Math.max(min, Math.min(this.xMax(), span));
+    var f = (x - v[0]) / (v[1] - v[0]);
+    this.setView([x - f * span, x + (1 - f) * span]);
+  };
+
+  ChartStack.prototype.setView = function (v, silent) {
+    var max = this.xMax();
+    var span = Math.min(max, v[1] - v[0]);
+    var a = v[0], b = a + span;
+    if (a < 0) { a = 0; b = span; }
+    if (b > max) { b = max; a = max - span; }
+    this.view = [a, b];
+    this.draw();
+    if (!silent && this.opts.onView) this.opts.onView(this.viewIndices());
+  };
+
+  ChartStack.prototype.resetView = function () { this.setView([0, this.xMax()]); };
+
+  ChartStack.prototype.viewIndices = function () {
+    return { i0: this.idxAt(this.view[0]), i1: this.idxAt(this.view[1]), x0: this.view[0], x1: this.view[1] };
+  };
+
+  ChartStack.prototype.setSelection = function (sel, silent) {
+    this.selection = sel;
+    this.draw();
+    void silent;
+    if (this.opts.onSelect) this.opts.onSelect(this.selectionIndices());
+  };
+
+  ChartStack.prototype.selectionIndices = function () {
+    if (!this.selection) return null;
+    return { i0: this.idxAt(this.selection[0]), i1: this.idxAt(this.selection[1]) };
+  };
+
+  ChartStack.prototype.setSelectionIndices = function (i0, i1) {
+    if (i0 == null) { this.setSelection(null); return; }
+    var a = this.xArray();
+    i0 = Math.max(0, Math.min(a.length - 1, i0));
+    i1 = Math.max(0, Math.min(a.length - 1, i1));
+    this.setSelection([a[Math.min(i0, i1)], a[Math.max(i0, i1)]]);
+  };
+
+  ChartStack.prototype.zoomToSelection = function () {
+    if (!this.selection) return;
+    var pad = (this.selection[1] - this.selection[0]) * 0.08;
+    this.setView([this.selection[0] - pad, this.selection[1] + pad]);
+  };
+
+  ChartStack.prototype.setHover = function (x) {
+    this.hoverX = x;
+    this._updateCursorValues();
+    this.draw();
+    if (this.opts.onHover) this.opts.onHover(x == null ? null : this.idxAt(x));
+  };
+
+  ChartStack.prototype.setHoverIndex = function (i) {
+    if (i == null) { this.hoverX = null; } else { this.hoverX = this.xArray()[i]; }
+    this._updateCursorValues();
+    this.draw();
+  };
+
+  ChartStack.prototype.setOverlay = function (key, data) {
+    if (data) this.overlays[key] = data; else delete this.overlays[key];
+    this.draw();
+  };
+
+  ChartStack.prototype._updateCursorValues = function () {
+    var i = this.hoverX == null ? null : this.idxAt(this.hoverX);
+    this.rows.forEach(function (row) {
+      if (!row.valEl) return;
+      if (i == null) { row.valEl.textContent = ''; return; }
+      var v = row.ch.data[i];
+      row.valEl.textContent = isFinite(v) ? v.toFixed(row.ch.decimals) : '—';
+    });
+  };
+
+  ChartStack.prototype.resize = function () {
+    if (!this.track) return;
+    var dpr = global.devicePixelRatio || 1;
+    var w = this.el.clientWidth;
+    var nVis = this.rows.filter(function (r) { return r.visible; }).length || 1;
+    var heads = 0;
+    this.rows.forEach(function (r) {
+      if (!r.visible || !r.el) return;
+      var hd = r.el.querySelector('.chart-head');
+      heads += (hd ? hd.offsetHeight : 22) + 1;
+    });
+    var avail = this.el.clientHeight - 2 - heads;
+    var rowH = Math.max(64, Math.min(150, Math.floor(avail / nVis)));
+    this.rows.forEach(function (row) {
+      if (!row.visible) return;
+      var c = row.canvas;
+      c.style.height = rowH + 'px';
+      c.style.width = '100%';
+      c.width = Math.max(1, Math.round(w * dpr));
+      c.height = Math.max(1, Math.round(c.clientHeight * dpr));
+    });
+    [this.axisCanvas, this.ovCanvas].forEach(function (c) {
+      if (!c) return;
+      c.style.width = '100%';
+      c.width = Math.max(1, Math.round(w * dpr));
+      c.height = Math.max(1, Math.round(c.clientHeight * dpr));
+    });
+    this.draw();
+  };
+
+  ChartStack.prototype.draw = function () {
+    var self = this;
+    if (this._raf) return;
+    this._raf = global.requestAnimationFrame(function () { self._raf = null; self._draw(); });
+  };
+
+  ChartStack.prototype._yRange = function (row) {
+    var i0 = this.idxAt(this.view[0]), i1 = this.idxAt(this.view[1]);
+    var d = row.ch.data, min = Infinity, max = -Infinity;
+    for (var i = i0; i <= i1; i++) {
+      var v = d[i];
+      if (!isFinite(v)) continue;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    var ov = this.overlays[row.ch.key];
+    if (ov) for (var j = i0; j <= i1; j++) {
+      var w = ov[j];
+      if (!isFinite(w)) continue;
+      if (w < min) min = w;
+      if (w > max) max = w;
+    }
+    if (!isFinite(min) || !isFinite(max)) { min = 0; max = 1; }
+    if (min === max) { min -= 1; max += 1; }
+    var pad = (max - min) * 0.08;
+    return [min - pad, max + pad];
+  };
+
+  ChartStack.prototype._draw = function () {
+    if (!this.track) return;
+    var self = this;
+    this.rows.forEach(function (row) { if (row.visible) self._drawRow(row); });
+    this._drawAxis();
+    this._drawOverview();
+  };
+
+  ChartStack.prototype._drawRow = function (row) {
+    var self = this;
+    var ctx = row.ctx, c = row.canvas;
+    var dpr = global.devicePixelRatio || 1;
+    var W = c.width, H = c.height;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var w = W / dpr, h = H / dpr;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = '#0d141c';
+    ctx.fillRect(0, 0, w, h);
+
+    var yr = row.yMode === 'fixed' && isFinite(row.yMin) && isFinite(row.yMax) && row.yMax > row.yMin
+      ? [row.yMin, row.yMax] : this._yRange(row);
+    var y0 = yr[0], y1 = yr[1];
+    var plotW = w - GUTTER - 8, plotH = h - 6;
+    var toY = function (v) { return 3 + plotH - (v - y0) / (y1 - y0) * plotH; };
+    var toX = function (x) { return GUTTER + (x - self.view[0]) / (self.view[1] - self.view[0]) * plotW; };
+
+    // grid + y labels
+    var ticks = niceTicks(y0, y1, Math.max(2, Math.round(plotH / 26)));
+    ctx.font = '10px ui-monospace, monospace';
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ticks.forEach(function (tv) {
+      var py = toY(tv);
+      if (py < 2 || py > h - 2) return;
+      ctx.strokeStyle = (tv === 0 && row.ch.zero) ? '#33465a' : '#18222d';
+      ctx.beginPath(); ctx.moveTo(GUTTER, py + 0.5); ctx.lineTo(w - 8, py + 0.5); ctx.stroke();
+      ctx.fillStyle = '#6b7f93';
+      ctx.fillText(Math.abs(tv) >= 1000 ? tv.toFixed(0) : tv.toFixed(row.ch.decimals), GUTTER - 6, py);
+    });
+
+    // x grid
+    var xt = niceTicks(this.view[0], this.view[1], Math.max(2, Math.round(plotW / 110)));
+    ctx.strokeStyle = '#151f29';
+    xt.forEach(function (xv) {
+      var px = Math.round(toX(xv)) + 0.5;
+      if (px < GUTTER || px > w - 8) return;
+      ctx.beginPath(); ctx.moveTo(px, 2); ctx.lineTo(px, h - 2); ctx.stroke();
+    });
+
+    this._drawSeries(ctx, row.ch.data, row.ch, toX, toY, plotW, h, false);
+    var ov = this.overlays[row.ch.key];
+    if (ov) this._drawSeries(ctx, ov, row.ch, toX, toY, plotW, h, true);
+
+    // selection
+    if (this.selection) {
+      var sa = toX(this.selection[0]), sb = toX(this.selection[1]);
+      ctx.fillStyle = 'rgba(249,168,37,0.13)';
+      ctx.fillRect(Math.max(GUTTER, sa), 0, Math.min(w - 8, sb) - Math.max(GUTTER, sa), h);
+      ctx.strokeStyle = 'rgba(249,168,37,0.75)';
+      ctx.beginPath();
+      [sa, sb].forEach(function (px) {
+        if (px >= GUTTER && px <= w - 8) { ctx.moveTo(Math.round(px) + 0.5, 0); ctx.lineTo(Math.round(px) + 0.5, h); }
+      });
+      ctx.stroke();
+    }
+
+    // hover
+    if (this.hoverX != null) {
+      var hx = toX(this.hoverX);
+      if (hx >= GUTTER && hx <= w - 8) {
+        ctx.strokeStyle = 'rgba(226,240,255,0.45)';
+        ctx.beginPath(); ctx.moveTo(Math.round(hx) + 0.5, 0); ctx.lineTo(Math.round(hx) + 0.5, h); ctx.stroke();
+      }
+    }
+    ctx.strokeStyle = '#1c2733';
+    ctx.strokeRect(GUTTER + 0.5, 0.5, plotW - 1, h - 1);
+  };
+
+  /** Draws a series, decimated to one min/max column per pixel when dense. */
+  ChartStack.prototype._drawSeries = function (ctx, data, ch, toX, toY, plotW, h, overlay) {
+    var x = this.xArray();
+    var i0 = this.idxAt(this.view[0]), i1 = this.idxAt(this.view[1]);
+    if (i1 <= i0) return;
+    var span = this.view[1] - this.view[0];
+    var a = Math.max(0, i0 - 1), b = Math.min(x.length - 1, i1 + 1);
+    var dense = (i1 - i0) / plotW > 1.2;
+    var cols = [], cur = null, col = -1, hole = false;
+
+    for (var i = a; i <= b; i++) {
+      var v = data[i];
+      if (!isFinite(v)) { if (cur) { cols.push(cur); cur = null; } col = -1; hole = true; continue; }
+      if (dense) {
+        var pc = Math.floor((x[i] - this.view[0]) / span * plotW);
+        if (pc !== col || !cur) {
+          if (cur) cols.push(cur);
+          col = pc;
+          cur = { px: GUTTER + pc + 0.5, mn: v, mx: v, first: v, last: v, brk: hole };
+          hole = false;
+        } else {
+          if (v < cur.mn) cur.mn = v;
+          if (v > cur.mx) cur.mx = v;
+          cur.last = v;
+        }
+      } else {
+        cols.push({ px: toX(x[i]), mn: v, mx: v, first: v, last: v, brk: hole });
+        hole = false;
+      }
+    }
+    if (cur) cols.push(cur);
+    if (!cols.length) return;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(GUTTER, 0, plotW, h);
+    ctx.clip();
+
+    if (ch.fill && !overlay) {
+      ctx.beginPath();
+      ctx.moveTo(cols[0].px, h);
+      for (var k = 0; k < cols.length; k++) ctx.lineTo(cols[k].px, toY(cols[k].mx));
+      ctx.lineTo(cols[cols.length - 1].px, h);
+      ctx.closePath();
+      ctx.globalAlpha = 0.13;
+      ctx.fillStyle = ch.color;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.lineWidth = overlay ? 1.7 : 1.2;
+    ctx.strokeStyle = overlay ? '#f97316' : ch.color;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    var started = false;
+    for (var c2 = 0; c2 < cols.length; c2++) {
+      var o = cols[c2];
+      if (!started || o.brk) { ctx.moveTo(o.px, toY(o.first)); started = true; }
+      else ctx.lineTo(o.px, toY(o.first));
+      if (o.mn !== o.mx) { ctx.lineTo(o.px, toY(o.mn)); ctx.lineTo(o.px, toY(o.mx)); }
+      ctx.lineTo(o.px, toY(o.last));
+    }
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  ChartStack.prototype._drawAxis = function () {
+    var ctx = this.axisCtx, c = this.axisCanvas;
+    if (!ctx) return;
+    var dpr = global.devicePixelRatio || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var w = c.width / dpr, h = c.height / dpr;
+    ctx.clearRect(0, 0, w, h);
+    var plotW = w - GUTTER - 8;
+    var ticks = niceTicks(this.view[0], this.view[1], Math.max(2, Math.round(plotW / 110)));
+    ctx.font = '10px ui-monospace, monospace';
+    ctx.fillStyle = '#7b8fa3';
+    ctx.textBaseline = 'top';
+    var self = this;
+    ticks.forEach(function (tv) {
+      var px = GUTTER + (tv - self.view[0]) / (self.view[1] - self.view[0]) * plotW;
+      if (px < GUTTER - 1 || px > w - 8) return;
+      ctx.textAlign = 'center';
+      ctx.fillText(self.fmtX(tv), px, 3);
+    });
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#4d6070';
+    ctx.fillText(this.xMode === 'dist' ? 'distance' : 'temps', 4, 3);
+  };
+
+  ChartStack.prototype._drawOverview = function () {
+    var ctx = this.ovCtx, c = this.ovCanvas;
+    if (!ctx) return;
+    var dpr = global.devicePixelRatio || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var w = c.width / dpr, h = c.height / dpr;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = '#0b1119';
+    ctx.fillRect(0, 0, w, h);
+    var plotW = w - GUTTER - 8;
+    var x = this.xArray(), max = this.xMax();
+    var ele = this.track.eleSmooth;
+    var mn = Infinity, mx = -Infinity;
+    for (var i = 0; i < ele.length; i++) { if (ele[i] < mn) mn = ele[i]; if (ele[i] > mx) mx = ele[i]; }
+    if (mx <= mn) mx = mn + 1;
+    ctx.beginPath();
+    ctx.moveTo(GUTTER, h);
+    for (var j = 0; j < x.length; j += Math.max(1, Math.floor(x.length / plotW))) {
+      ctx.lineTo(GUTTER + x[j] / max * plotW, h - 2 - (ele[j] - mn) / (mx - mn) * (h - 6));
+    }
+    ctx.lineTo(GUTTER + plotW, h);
+    ctx.closePath();
+    ctx.fillStyle = '#1c2c3b';
+    ctx.fill();
+
+    if (this.selection) {
+      ctx.fillStyle = 'rgba(249,168,37,0.30)';
+      var sa = GUTTER + this.selection[0] / max * plotW, sb = GUTTER + this.selection[1] / max * plotW;
+      ctx.fillRect(sa, 0, Math.max(1, sb - sa), h);
+    }
+    var va = GUTTER + this.view[0] / max * plotW, vb = GUTTER + this.view[1] / max * plotW;
+    ctx.fillStyle = 'rgba(56,189,248,0.16)';
+    ctx.fillRect(va, 0, Math.max(2, vb - va), h);
+    ctx.strokeStyle = '#38bdf8';
+    ctx.strokeRect(va + 0.5, 0.5, Math.max(2, vb - va) - 1, h - 1);
+    ctx.font = '10px ui-monospace, monospace';
+    ctx.fillStyle = '#4d6070';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText('vue', 6, h / 2);
+  };
+
+  global.ChartStack = ChartStack;
+  global.ChartUtils = { fmtClock: fmtClock, niceTicks: niceTicks };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/* Canvas slippy-map: raster background tiles + the track, the visible chart
+ * window, the current selection and the cursor position.
+ * No mapping library — only the tile servers are remote.
+ */
+(function (global) {
+  'use strict';
+
+  var SOURCES = {
+    osm: { name: 'OpenStreetMap', url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', max: 19, attr: '© OpenStreetMap contributors' },
+    topo: { name: 'OpenTopoMap', url: 'https://a.tile.opentopomap.org/{z}/{x}/{y}.png', max: 17, attr: '© OpenTopoMap (CC-BY-SA), © OpenStreetMap contributors' },
+    cyclo: { name: 'CyclOSM', url: 'https://a.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', max: 19, attr: '© CyclOSM, © OpenStreetMap contributors' },
+    carto: { name: 'Carto sombre', url: 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', max: 19, attr: '© CARTO, © OpenStreetMap contributors' },
+    none: { name: 'Aucun fond (hors ligne)', url: null, max: 22, attr: '' }
+  };
+
+  function lonToNx(lon) { return (lon + 180) / 360; }
+  function latToNy(lat) {
+    var s = Math.sin(lat * Math.PI / 180);
+    s = Math.max(-0.9999, Math.min(0.9999, s));
+    return 0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI);
+  }
+  function nyToLat(ny) {
+    var y = (0.5 - ny) * 2 * Math.PI;
+    return Math.atan(Math.sinh(y)) * 180 / Math.PI;
+  }
+
+  function TrackMap(canvas, opts) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.opts = opts || {};
+    this.track = null;
+    this.cx = 0.5; this.cy = 0.5; this.z = 12;
+    this.source = 'osm';
+    this.tiles = new Map();
+    this.pending = 0;
+    this.view = null;
+    this.selection = null;
+    this.hover = null;
+    this.selectMode = false;
+    this._raf = null;
+    this._bind();
+    var self = this;
+    if (global.ResizeObserver) {
+      new ResizeObserver(function () { self.resize(); }).observe(canvas.parentElement || canvas);
+    }
+  }
+
+  TrackMap.prototype.setSource = function (key) { this.source = key; this.tiles.clear(); this.draw(); };
+  TrackMap.prototype.sources = function () { return SOURCES; };
+
+  TrackMap.prototype.setTrack = function (track) {
+    this.track = track;
+    var n = track.n;
+    this.nx = new Float64Array(n); this.ny = new Float64Array(n);
+    for (var i = 0; i < n; i++) { this.nx[i] = lonToNx(track.lon[i]); this.ny[i] = latToNy(track.lat[i]); }
+    var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (var j = 0; j < n; j++) {
+      if (this.nx[j] < x0) x0 = this.nx[j];
+      if (this.nx[j] > x1) x1 = this.nx[j];
+      if (this.ny[j] < y0) y0 = this.ny[j];
+      if (this.ny[j] > y1) y1 = this.ny[j];
+    }
+    this.bounds = { x0: x0, x1: x1, y0: y0, y1: y1 };
+    this.resize();
+    this.fitBounds(this.bounds);
+  };
+
+  TrackMap.prototype.fitBounds = function (b, pad) {
+    if (!b || !this.canvas.clientWidth) return;
+    pad = pad == null ? 28 : pad;
+    var w = this.canvas.clientWidth - 2 * pad, h = this.canvas.clientHeight - 2 * pad;
+    var dx = Math.max(1e-9, b.x1 - b.x0), dy = Math.max(1e-9, b.y1 - b.y0);
+    var zx = Math.log2(w / (256 * dx)), zy = Math.log2(h / (256 * dy));
+    this.z = Math.max(1, Math.min(SOURCES[this.source].max, Math.min(zx, zy)));
+    this.cx = (b.x0 + b.x1) / 2; this.cy = (b.y0 + b.y1) / 2;
+    this.draw();
+  };
+
+  TrackMap.prototype.boundsOf = function (i0, i1) {
+    if (!this.track || i0 == null) return null;
+    var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (var i = Math.min(i0, i1); i <= Math.max(i0, i1); i++) {
+      if (this.nx[i] < x0) x0 = this.nx[i];
+      if (this.nx[i] > x1) x1 = this.nx[i];
+      if (this.ny[i] < y0) y0 = this.ny[i];
+      if (this.ny[i] > y1) y1 = this.ny[i];
+    }
+    return isFinite(x0) ? { x0: x0, x1: x1, y0: y0, y1: y1 } : null;
+  };
+
+  TrackMap.prototype.scale = function () { return 256 * Math.pow(2, this.z); };
+  TrackMap.prototype.toPx = function (nx, ny) {
+    var s = this.scale();
+    return [(nx - this.cx) * s + this.canvas.clientWidth / 2, (ny - this.cy) * s + this.canvas.clientHeight / 2];
+  };
+  TrackMap.prototype.fromPx = function (px, py) {
+    var s = this.scale();
+    return [(px - this.canvas.clientWidth / 2) / s + this.cx, (py - this.canvas.clientHeight / 2) / s + this.cy];
+  };
+
+  TrackMap.prototype.nearestIndex = function (px, py) {
+    if (!this.track) return null;
+    var n = this.track.n, s = this.scale();
+    var w = this.canvas.clientWidth / 2, h = this.canvas.clientHeight / 2;
+    var best = -1, bestD = Infinity;
+    for (var i = 0; i < n; i++) {
+      var dx = (this.nx[i] - this.cx) * s + w - px;
+      var dy = (this.ny[i] - this.cy) * s + h - py;
+      var d = dx * dx + dy * dy;
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    return { index: best, dist: Math.sqrt(bestD) };
+  };
+
+  TrackMap.prototype._bind = function () {
+    var self = this, drag = null;
+    var c = this.canvas;
+    c.addEventListener('wheel', function (ev) {
+      ev.preventDefault();
+      var r = c.getBoundingClientRect();
+      var px = ev.clientX - r.left, py = ev.clientY - r.top;
+      var before = self.fromPx(px, py);
+      self.z = Math.max(1, Math.min(SOURCES[self.source].max, self.z - ev.deltaY * 0.0025));
+      var after = self.fromPx(px, py);
+      self.cx += before[0] - after[0];
+      self.cy += before[1] - after[1];
+      self.draw();
+    }, { passive: false });
+
+    c.addEventListener('pointerdown', function (ev) {
+      c.setPointerCapture(ev.pointerId);
+      var r = c.getBoundingClientRect();
+      var px = ev.clientX - r.left, py = ev.clientY - r.top;
+      var selecting = self.selectMode !== ev.shiftKey;  // shift inverts the mode
+      if (selecting) {
+        var near = self.nearestIndex(px, py);
+        if (near && near.dist < 40) {
+          drag = { select: true, anchor: near.index };
+          if (self.opts.onSelect) self.opts.onSelect(near.index, near.index);
+        } else drag = { select: false, px: px, py: py, cx: self.cx, cy: self.cy };
+      } else {
+        drag = { select: false, px: px, py: py, cx: self.cx, cy: self.cy };
+      }
+    });
+    c.addEventListener('pointermove', function (ev) {
+      var r = c.getBoundingClientRect();
+      var px = ev.clientX - r.left, py = ev.clientY - r.top;
+      if (drag && drag.select) {
+        var near = self.nearestIndex(px, py);
+        if (near && self.opts.onSelect) self.opts.onSelect(drag.anchor, near.index);
+      } else if (drag) {
+        var s = self.scale();
+        self.cx = drag.cx - (px - drag.px) / s;
+        self.cy = drag.cy - (py - drag.py) / s;
+        self.draw();
+      } else if (self.opts.onHover) {
+        var nr = self.nearestIndex(px, py);
+        self.opts.onHover(nr && nr.dist < 30 ? nr.index : null);
+      }
+    });
+    function end() {
+      if (drag && drag.select && self.opts.onSelectEnd) self.opts.onSelectEnd();
+      drag = null;
+    }
+    c.addEventListener('pointerup', end);
+    c.addEventListener('pointercancel', end);
+    c.addEventListener('pointerleave', function () { if (self.opts.onHover) self.opts.onHover(null); });
+    c.addEventListener('dblclick', function () { self.fitBounds(self.bounds); });
+  };
+
+  TrackMap.prototype.resize = function () {
+    var dpr = global.devicePixelRatio || 1;
+    var c = this.canvas;
+    c.width = Math.max(1, Math.round(c.clientWidth * dpr));
+    c.height = Math.max(1, Math.round(c.clientHeight * dpr));
+    this.draw();
+  };
+
+  TrackMap.prototype.setView = function (i0, i1) { this.view = i0 == null ? null : [i0, i1]; this.draw(); };
+  TrackMap.prototype.setSelection = function (i0, i1) { this.selection = i0 == null ? null : [i0, i1]; this.draw(); };
+  TrackMap.prototype.setHover = function (i) { this.hover = i; this.draw(); };
+
+  TrackMap.prototype.draw = function () {
+    var self = this;
+    if (this._raf) return;
+    this._raf = global.requestAnimationFrame(function () { self._raf = null; self._draw(); });
+  };
+
+  TrackMap.prototype._tile = function (z, x, y) {
+    var src = SOURCES[this.source];
+    if (!src.url) return null;
+    var max = Math.pow(2, z);
+    x = ((x % max) + max) % max;
+    if (y < 0 || y >= max) return null;
+    var key = this.source + '/' + z + '/' + x + '/' + y;
+    var img = this.tiles.get(key);
+    if (img) return img.complete && img.naturalWidth ? img : null;
+    if (this.tiles.size > 600) this.tiles.clear();
+    img = new Image();
+    img.crossOrigin = 'anonymous';
+    var self = this;
+    img.onload = function () { self.draw(); };
+    img.onerror = function () { img.failed = true; };
+    img.src = src.url.replace('{z}', z).replace('{x}', x).replace('{y}', y);
+    this.tiles.set(key, img);
+    return null;
+  };
+
+  TrackMap.prototype._draw = function () {
+    var ctx = this.ctx, c = this.canvas;
+    var dpr = global.devicePixelRatio || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var w = c.clientWidth, h = c.clientHeight;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = '#0b1119';
+    ctx.fillRect(0, 0, w, h);
+    if (!this.track) return;
+
+    // --- tiles
+    var src = SOURCES[this.source];
+    if (src.url) {
+      var zi = Math.max(0, Math.min(src.max, Math.round(this.z)));
+      var scale = Math.pow(2, this.z - zi);
+      var ts = 256 * scale;
+      var world = 256 * Math.pow(2, zi);
+      var originX = this.cx * world * scale - w / 2;
+      var originY = this.cy * world * scale - h / 2;
+      var tx0 = Math.floor(originX / ts), tx1 = Math.floor((originX + w) / ts);
+      var ty0 = Math.floor(originY / ts), ty1 = Math.floor((originY + h) / ts);
+      ctx.imageSmoothingEnabled = true;
+      for (var ty = ty0; ty <= ty1; ty++) {
+        for (var tx = tx0; tx <= tx1; tx++) {
+          var img = this._tile(zi, tx, ty);
+          var dx = Math.round(tx * ts - originX), dy = Math.round(ty * ts - originY);
+          if (img) ctx.drawImage(img, dx, dy, Math.ceil(ts), Math.ceil(ts));
+          else { ctx.fillStyle = '#101a24'; ctx.fillRect(dx, dy, Math.ceil(ts), Math.ceil(ts)); }
+        }
+      }
+    }
+
+    // --- track
+    var self = this;
+    function polyline(i0, i1, color, width, alpha) {
+      if (i1 <= i0) return;
+      var s = self.scale();
+      ctx.save();
+      ctx.globalAlpha = alpha == null ? 1 : alpha;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      ctx.beginPath();
+      var lastX = -1e9, lastY = -1e9, started = false;
+      for (var i = i0; i <= i1; i++) {
+        var px = (self.nx[i] - self.cx) * s + w / 2;
+        var py = (self.ny[i] - self.cy) * s + h / 2;
+        if (started && Math.abs(px - lastX) < 1.2 && Math.abs(py - lastY) < 1.2 && i !== i1) continue;
+        if (!started) { ctx.moveTo(px, py); started = true; } else ctx.lineTo(px, py);
+        lastX = px; lastY = py;
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    polyline(0, this.track.n - 1, '#7dd3fc', 2.4, 0.55);
+    if (this.view) polyline(this.view[0], this.view[1], '#38bdf8', 3.6, 1);
+    if (this.selection) polyline(Math.min(this.selection[0], this.selection[1]), Math.max(this.selection[0], this.selection[1]), '#f59e0b', 5, 1);
+
+    function marker(i, fill, r) {
+      if (i == null) return;
+      var s = self.scale();
+      var px = (self.nx[i] - self.cx) * s + w / 2;
+      var py = (self.ny[i] - self.cy) * s + h / 2;
+      ctx.beginPath(); ctx.arc(px, py, r, 0, 2 * Math.PI);
+      ctx.fillStyle = fill; ctx.fill();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = '#0b1119'; ctx.stroke();
+    }
+    marker(0, '#22c55e', 5);
+    marker(this.track.n - 1, '#ef4444', 5);
+    if (this.selection) {
+      marker(Math.min(this.selection[0], this.selection[1]), '#fbbf24', 4);
+      marker(Math.max(this.selection[0], this.selection[1]), '#fbbf24', 4);
+    }
+    if (this.hover != null) marker(this.hover, '#ffffff', 4.5);
+
+    // --- scale bar
+    var mPerPx = 156543.03392 * Math.cos(nyToLat(this.cy) * Math.PI / 180) / Math.pow(2, this.z);
+    var target = 90 * mPerPx;
+    var pow = Math.pow(10, Math.floor(Math.log10(target)));
+    var mult = target / pow >= 5 ? 5 : target / pow >= 2 ? 2 : 1;
+    var barM = mult * pow, barPx = barM / mPerPx;
+    ctx.fillStyle = 'rgba(11,17,25,0.72)';
+    ctx.fillRect(8, h - 26, barPx + 16, 18);
+    ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(16, h - 12); ctx.lineTo(16 + barPx, h - 12); ctx.stroke();
+    ctx.fillStyle = '#e2e8f0';
+    ctx.font = '10px ui-monospace, monospace';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    ctx.fillText(barM >= 1000 ? (barM / 1000) + ' km' : barM + ' m', 18, h - 14);
+
+    if (src.attr) {
+      ctx.font = '10px system-ui, sans-serif';
+      ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+      var txt = src.attr;
+      var tw = ctx.measureText(txt).width;
+      ctx.fillStyle = 'rgba(11,17,25,0.7)';
+      ctx.fillRect(w - tw - 10, h - 16, tw + 10, 16);
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillText(txt, w - 5, h - 3);
+    }
+  };
+
+  global.TrackMap = TrackMap;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/* Starca Tuner — application shell: loading, panels, selection, export. */
+(function () {
+  'use strict';
+
+  var S = {
+    fileName: null, source: null, track: null, stack: null, map: null,
+    edits: [], selection: null, pending: null, lastResult: null
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var fmtClock = window.ChartUtils.fmtClock;
+
+  function fmtDelta(sec) {
+    var s = Math.round(Math.abs(sec));
+    var m = Math.floor(s / 60);
+    return (sec >= 0 ? '−' : '+') + (m ? m + ' min ' : '') + (s % 60) + ' s';
+  }
+  function fmtDist(m) { return m >= 1000 ? (m / 1000).toFixed(2) + ' km' : Math.round(m) + ' m'; }
+
+  /* ------------------------------------------------------------------ load */
+
+  function loadText(text, name) {
+    var source, track;
+    try {
+      source = GPX.parse(text);
+      track = Track.build(source, analysisOpts());
+    } catch (e) {
+      alert('Lecture impossible : ' + e.message);
+      return;
+    }
+    S.fileName = name; S.source = source; S.track = track; S.edits = []; S.selection = null; S.pending = null;
+
+    $('empty').hidden = true;
+    $('export').disabled = false;
+
+    if (!S.stack) {
+      S.stack = new ChartStack($('charts'), {
+        footer: $('chartFooter'),
+        onView: function (v) { S.map.setView(v.i0, v.i1); },
+        onSelect: onChartSelect,
+        onHover: function (i) { S.map.setHover(i); }
+      });
+    }
+    S.stack.setTrack(track);
+
+    if (!S.map) {
+      S.map = new TrackMap($('map'), {
+        onSelect: function (a, b) { S.stack.setSelectionIndices(a, b); },
+        onHover: function (i) { S.stack.setHoverIndex(i); }
+      });
+      var sel = $('tileSource'), srcs = S.map.sources();
+      Object.keys(srcs).forEach(function (k) {
+        var o = document.createElement('option');
+        o.value = k; o.textContent = srcs[k].name;
+        sel.appendChild(o);
+      });
+      sel.value = S.map.source;
+      sel.addEventListener('change', function () { S.map.setSource(sel.value); });
+    }
+    S.map.setTrack(track);
+    S.map.setView(0, track.n - 1);
+
+    buildChannelChips();
+    buildFilterRows();
+    renderActivity();
+    renderEdits();
+    updateSelectionUI();
+    updateOverlay();
+  }
+
+  function analysisOpts() {
+    return {
+      speedSmooth: parseFloat($('optSpeedSmooth').value) || 5,
+      gradeWindow: parseFloat($('optGradeWin').value) || 40,
+      pauseGap: parseFloat($('optPause').value) || 10
+    };
+  }
+
+  function renderActivity() {
+    var t = S.track, st = t.stats;
+    var d = new Date(st.startMs);
+    $('activity').innerHTML = '<b>' + escapeHtml(S.source.name) + '</b> — ' + d.toLocaleString('fr-FR') +
+      ' · ' + fmtDist(st.distance) + ' · ' + fmtClock(st.duration) +
+      ' · D+ ' + Math.round(st.elevGain) + ' m · ' + st.avgMovingKmh.toFixed(1) + ' km/h moy' +
+      ' · ' + t.n + ' points';
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&quot;';
+    });
+  }
+
+  /* -------------------------------------------------------------- channels */
+
+  function buildChannelChips() {
+    var box = $('chanToggles');
+    box.innerHTML = '';
+    S.track.channels.forEach(function (ch) {
+      var b = document.createElement('button');
+      b.className = 'chip on';
+      b.innerHTML = '<span class="cdot" style="background:' + ch.color + '"></span>' + escapeHtml(ch.label);
+      b.addEventListener('click', function () {
+        var on = !b.classList.contains('on');
+        b.classList.toggle('on', on);
+        S.stack.setRowVisible(ch.key, on);
+      });
+      box.appendChild(b);
+    });
+  }
+
+  /* ------------------------------------------------------------- selection */
+
+  function onChartSelect(sel) {
+    S.selection = sel;
+    if (sel) S.map.setSelection(sel.i0, sel.i1); else S.map.setSelection(null);
+    updateSelectionUI();
+    updatePreview();
+  }
+
+  function segStats(i0, i1) {
+    var t = S.track;
+    i0 = Math.max(0, Math.min(t.n - 1, i0)); i1 = Math.max(0, Math.min(t.n - 1, i1));
+    if (i1 < i0) { var s = i0; i0 = i1; i1 = s; }
+    var dur = t.t[i1] - t.t[i0], dist = t.dist[i1] - t.dist[i0];
+    var gain = 0, moving = 0, movDist = 0;
+    for (var i = i0; i < i1; i++) {
+      var de = t.eleSmooth[i + 1] - t.eleSmooth[i];
+      if (de > 0) gain += de;
+      if (!t.gap[i] && t.dSeg[i] / Math.max(0.001, t.dtSeg[i]) > 0.8) { moving += t.dtSeg[i]; movDist += t.dSeg[i]; }
+    }
+    return {
+      i0: i0, i1: i1, dur: dur, dist: dist, gain: gain,
+      avg: dur > 0 ? dist / dur * 3.6 : 0,
+      avgMoving: moving > 0 ? movDist / moving * 3.6 : 0,
+      grade: dist > 0 ? Math.atan2(t.eleSmooth[i1] - t.eleSmooth[i0], dist) * 180 / Math.PI : 0
+    };
+  }
+
+  function updateSelectionUI() {
+    var has = !!S.selection;
+    $('zoomSel').disabled = !has;
+    $('clearSel').disabled = !has;
+    $('mapFitSel').disabled = !has;
+    $('editCard').hidden = !has;
+    if (!has) {
+      $('selInfo').className = 'kv dim';
+      $('selInfo').textContent = 'Aucune sélection. Glissez dans un graphe, ou activez « Sélection sur la carte ».';
+      return;
+    }
+    var st = segStats(S.selection.i0, S.selection.i1);
+    var t = S.track;
+    $('selInfo').className = 'kv';
+    $('selInfo').innerHTML =
+      row('Départ', fmtClock(t.t[st.i0]) + '  ·  ' + fmtDist(t.dist[st.i0])) +
+      row('Arrivée', fmtClock(t.t[st.i1]) + '  ·  ' + fmtDist(t.dist[st.i1])) +
+      row('Durée', fmtClock(st.dur)) +
+      row('Distance', fmtDist(st.dist)) +
+      row('Vitesse moy.', st.avg.toFixed(1) + ' km/h' + (st.avgMoving - st.avg > 0.3 ? ' (' + st.avgMoving.toFixed(1) + ' en mouvement)' : '')) +
+      row('Dénivelé +', Math.round(st.gain) + ' m') +
+      row('Pente moy.', st.grade.toFixed(2) + ' °') +
+      row('Points', (st.i1 - st.i0 + 1) + '');
+    buildFilterRows();
+  }
+
+  function row(k, v) { return '<span>' + k + '</span><b>' + escapeHtml(v) + '</b>'; }
+
+  /* ---------------------------------------------------------------- filters */
+
+  function filterableChannels() {
+    return S.track.channels.filter(function (c) { return c.filterable !== false && c.key !== 'ele'; })
+      .concat(S.track.channels.filter(function (c) { return c.key === 'ele'; }));
+  }
+
+  var filterState = {};   // key -> {on, min, max}
+
+  function buildFilterRows() {
+    var box = $('filters');
+    if (!box || !S.track) return;
+    var sel = S.selection;
+    box.innerHTML = '';
+    filterableChannels().forEach(function (ch) {
+      var st = filterState[ch.key] || (filterState[ch.key] = { on: false, min: '', max: '' });
+      var rmin = Infinity, rmax = -Infinity;
+      if (sel) {
+        for (var i = sel.i0; i <= sel.i1; i++) {
+          var v = ch.data[i];
+          if (!isFinite(v)) continue;
+          if (v < rmin) rmin = v; if (v > rmax) rmax = v;
+        }
+      }
+      var rangeTxt = isFinite(rmin) ? rmin.toFixed(ch.decimals) + ' … ' + rmax.toFixed(ch.decimals) : '';
+      var el = document.createElement('div');
+      el.className = 'frow';
+      el.innerHTML =
+        '<label><input type="checkbox" ' + (st.on ? 'checked' : '') + '>' +
+        '<span class="fdot" style="background:' + ch.color + '"></span>' + escapeHtml(ch.label) +
+        (ch.unit ? ' <span class="u">' + ch.unit + '</span>' : '') + '</label>' +
+        '<span class="rng">' + rangeTxt + '</span>' +
+        '<input type="number" step="any" placeholder="min" value="' + st.min + '" ' + (st.on ? '' : 'disabled') + '>' +
+        '<input type="number" step="any" placeholder="max" value="' + st.max + '" ' + (st.on ? '' : 'disabled') + '>';
+      var cb = el.querySelector('input[type=checkbox]');
+      var mins = el.querySelectorAll('input[type=number]');
+      cb.addEventListener('change', function () {
+        st.on = cb.checked;
+        mins[0].disabled = mins[1].disabled = !st.on;
+        updatePreview();
+      });
+      mins[0].addEventListener('input', function () { st.min = mins[0].value; updatePreview(); });
+      mins[1].addEventListener('input', function () { st.max = mins[1].value; updatePreview(); });
+      box.appendChild(el);
+    });
+  }
+
+  /* ------------------------------------------------------------------ edit */
+
+  function readEdit() {
+    if (!S.selection) return null;
+    var e = Edits.defaultEdit(S.track, S.selection.i0, S.selection.i1);
+    e.mode = $('mode').value;
+    e.targetSec = (parseFloat($('targetMin').value) || 0) * 60 + (parseFloat($('targetSec').value) || 0);
+    e.factor = parseFloat($('factor').value) || 1;
+    e.deltaKmh = parseFloat($('delta2').value) || 0;
+    e.speedKmh = parseFloat($('speedTarget').value) || 0;
+    e.maxSpeedKmh = parseFloat($('maxSpeed').value) || 0;
+    e.minSpeedKmh = parseFloat($('minSpeed').value) || 0;
+    e.maxFactor = parseFloat($('maxFactor').value) || 2.5;
+    e.rampSec = parseFloat($('ramp').value) || 0;
+    e.smoothSec = parseFloat($('smooth').value) || 0;
+    e.filters = [];
+    filterableChannels().forEach(function (ch) {
+      var st = filterState[ch.key];
+      if (!st || !st.on) return;
+      var mn = st.min === '' ? null : parseFloat(st.min);
+      var mx = st.max === '' ? null : parseFloat(st.max);
+      if (mn === null && mx === null) return;
+      e.filters.push({ key: ch.key, label: ch.label, unit: ch.unit, min: isFinite(mn) ? mn : null, max: isFinite(mx) ? mx : null, enabled: true });
+    });
+    return e;
+  }
+
+  function describeFilters(e) {
+    if (!e.filters.length) return 'tous les points';
+    return e.filters.map(function (f) {
+      var s = f.label.toLowerCase();
+      if (f.min != null && f.max != null) return s + ' ' + f.min + '–' + f.max + ' ' + (f.unit || '');
+      if (f.min != null) return s + ' > ' + f.min + ' ' + (f.unit || '');
+      return s + ' < ' + f.max + ' ' + (f.unit || '');
+    }).join(', ');
+  }
+
+  function updatePreview() {
+    var box = $('preview');
+    S.pending = readEdit();
+    if (!S.pending) { updateOverlay(); return; }
+    var r = Edits.resolveEdit(S.track, S.pending);
+    var t = S.track;
+    var nInt = 0, sumT = 0, maxNew = 0, sumF = 0, fw = 0;
+    for (var i = r.i0; i < r.i1; i++) {
+      if (Math.abs(r.factors[i] - 1) < 1e-9) continue;
+      nInt++; sumT += t.dtSeg[i];
+      sumF += r.factors[i] * t.dtSeg[i]; fw += t.dtSeg[i];
+      var v = Edits.intervalSpeedKmh(t, i) * r.factors[i];
+      if (v > maxNew) maxNew = v;
+    }
+    var st = segStats(r.i0, r.i1);
+    var html = '';
+    if (!nInt) {
+      html = '<span class="warn">Aucun point ne correspond aux filtres sur ce tronçon.</span>';
+    } else {
+      html = 'Points retouchés : <b>' + nInt + '</b> (' + Math.round(sumT / Math.max(1, st.dur) * 100) + ' % de la durée du tronçon)<br>' +
+        'Facteur moyen : <b>×' + (fw ? sumF / fw : 1).toFixed(3) + '</b> · vitesse max atteinte <b>' + maxNew.toFixed(1) + ' km/h</b><br>' +
+        'Gain sur le tronçon : <b>' + fmtDelta(r.saved) + '</b> (' + fmtClock(st.dur) + ' → ' + fmtClock(st.dur - r.saved) + ')';
+      if (r.warn) html += '<br><span class="warn">' + escapeHtml(r.warn) + '</span>';
+    }
+    box.innerHTML = html;
+    updateOverlay();
+  }
+
+  /** Modified-speed curve = applied edits (+ the one being configured). */
+  function updateOverlay() {
+    if (!S.track || !S.stack) return;
+    var list = S.edits.slice();
+    if (S.pending) list.push(S.pending);
+    var comp = Edits.composeFactors(S.track, list);
+    var t = S.track, n = t.n;
+    var any = false;
+    var over = new Float64Array(n);
+    for (var i = 0; i < n; i++) {
+      var f = i === 0 ? comp.factor[0] : i >= n - 1 ? comp.factor[n - 2] : (comp.factor[i - 1] + comp.factor[i]) / 2;
+      if (!isFinite(f)) f = 1;
+      if (Math.abs(f - 1) > 1e-9) { any = true; over[i] = t.vSmooth[i] * 3.6 * f; }
+      else over[i] = NaN;
+    }
+    S.stack.setOverlay('speed', any ? over : null);
+
+    var applied = Edits.composeFactors(S.track, S.edits);
+    var saved = Edits.savedTime(S.track, applied.factor, 0, applied.factor.length);
+    $('delta').textContent = saved ? 'Gain cumulé : ' + fmtDelta(saved) + '  ·  ' +
+      fmtClock(t.stats.duration) + ' → ' + fmtClock(t.stats.duration - saved) : '';
+  }
+
+  function applyEdit() {
+    var e = readEdit();
+    if (!e) return;
+    var r = Edits.resolveEdit(S.track, e);
+    if (!r.count) { alert('Aucun point ne correspond aux filtres : rien à appliquer.'); return; }
+    e.label = describeFilters(e);
+    S.edits.push(e);
+    S.pending = null;
+    S.stack.setSelection(null);
+    renderEdits();
+    updateOverlay();
+  }
+
+  function renderEdits() {
+    var box = $('editList');
+    $('editCount').textContent = S.edits.length;
+    if (!S.edits.length) {
+      box.className = 'editlist dim';
+      box.textContent = 'Aucune modification appliquée.';
+      updateOverlay();
+      return;
+    }
+    box.className = 'editlist';
+    box.innerHTML = '';
+    var comp = Edits.composeFactors(S.track, S.edits);
+    S.edits.forEach(function (e, idx) {
+      var info = comp.perEdit[idx];
+      var t = S.track;
+      var el = document.createElement('div');
+      el.className = 'erow' + (e.enabled ? '' : ' off');
+      el.innerHTML =
+        '<div class="etxt"><div>' + (idx + 1) + '. ' + fmtDist(t.dist[e.i0]) + ' → ' + fmtDist(t.dist[e.i1]) +
+        '  <b>' + (e.enabled ? fmtDelta(info.saved || 0) : '—') + '</b></div>' +
+        '<div class="esub">' + escapeHtml(e.label || describeFilters(e)) + '</div></div>' +
+        '<button title="Voir sur la carte et les graphes">◎</button>' +
+        '<button title="Activer / désactiver">' + (e.enabled ? '👁' : '🚫') + '</button>' +
+        '<button title="Supprimer">🗑</button>';
+      var btns = el.querySelectorAll('button');
+      btns[0].addEventListener('click', function () {
+        S.stack.setSelectionIndices(e.i0, e.i1);
+        S.stack.zoomToSelection();
+        S.map.fitBounds(S.map.boundsOf(e.i0, e.i1));
+      });
+      btns[1].addEventListener('click', function () { e.enabled = !e.enabled; renderEdits(); updateOverlay(); });
+      btns[2].addEventListener('click', function () { S.edits.splice(idx, 1); renderEdits(); updateOverlay(); });
+      box.appendChild(el);
+    });
+    updateOverlay();
+  }
+
+  /* ---------------------------------------------------------------- export */
+
+  function buildOptions() {
+    return {
+      align: $('optAlign').checked,
+      adjust: {
+        power: $('optPower').checked, hr: $('optHr').checked,
+        mass: parseFloat($('mass').value) || 83,
+        cda: parseFloat($('cda').value) || 0.32,
+        crr: parseFloat($('crr').value) || 0.005,
+        hrMax: parseFloat($('hrMax').value) || 190
+      }
+    };
+  }
+
+  function doExport() {
+    var comp = Edits.composeFactors(S.track, S.edits);
+    var res = Edits.rebuild(S.track, comp.factor, buildOptions());
+    var text = GPX.build(S.source, res.points);
+    var check = GPXValidate.validate(text);
+    S.lastResult = res;
+
+    var t = S.track;
+    var name = (S.fileName || 'activite.gpx').replace(/\.gpx$/i, '') + '-retouche.gpx';
+    var html = '<table>' +
+      tr('Durée', fmtClock(res.stats.oldDuration) + '  →  <b>' + fmtClock(res.stats.newDuration) + '</b>') +
+      tr('Gain', '<b>' + fmtDelta(res.stats.savedSec) + '</b>') +
+      tr('Distance', fmtDist(check.info.distanceM) + ' (origine ' + fmtDist(t.stats.distance) + ')') +
+      tr('Vitesse moyenne', (t.stats.distance / t.stats.duration * 3.6).toFixed(2) + ' → <b>' +
+        (t.stats.distance / res.stats.newDuration * 3.6).toFixed(2) + ' km/h</b>') +
+      tr('Points', t.n + ' → ' + res.stats.pointsOut + ' (' + res.stats.interpolated + ' recalculés)') +
+      tr('Début', new Date(check.info.start).toLocaleString('fr-FR')) +
+      tr('Fin', new Date(check.info.end).toLocaleString('fr-FR')) +
+      tr('Vitesse instantanée max.', check.info.maxSpeedKmh.toFixed(1) + ' km/h') +
+      '</table>';
+
+    html += check.ok
+      ? '<p class="ok">✓ Fichier conforme au schéma GPX 1.1 (structure, horodatages ISO-8601 strictement croissants, coordonnées valides) — prêt pour l’import Strava.</p>'
+      : '<p class="err">✗ Problèmes détectés :</p><ul class="err"><li>' + check.errors.map(escapeHtml).join('</li><li>') + '</li></ul>';
+    if (check.warnings.length) html += '<ul class="warn"><li>' + check.warnings.map(escapeHtml).join('</li><li>') + '</li></ul>';
+    if (!S.edits.length) html += '<p class="warn">Aucune modification n’est appliquée : le fichier exporté est identique à l’original.</p>';
+    html += '<p class="dim">Import Strava : « Ajouter → Fichier », ou glissez le fichier sur strava.com/upload. ' +
+      'Les horodatages avant la première retouche sont inchangés ; la suite est décalée du gain de temps.</p>';
+
+    $('modalTitle').textContent = name;
+    $('modalBody').innerHTML = html;
+    var a = $('download');
+    if (a.dataset.url) URL.revokeObjectURL(a.dataset.url);
+    var url = URL.createObjectURL(new Blob([text], { type: 'application/gpx+xml' }));
+    a.href = url; a.download = name; a.dataset.url = url;
+    $('modal').hidden = false;
+  }
+
+  function tr(k, v) { return '<tr><td>' + k + '</td><td>' + v + '</td></tr>'; }
+
+  /* ------------------------------------------------------------------ wire */
+
+  function wire() {
+    $('file').addEventListener('change', function (ev) {
+      var f = ev.target.files[0];
+      if (!f) return;
+      var fr = new FileReader();
+      fr.onload = function () { loadText(String(fr.result), f.name); };
+      fr.readAsText(f);
+    });
+
+    ['dragover', 'drop'].forEach(function (t) {
+      window.addEventListener(t, function (ev) { ev.preventDefault(); });
+    });
+    window.addEventListener('drop', function (ev) {
+      var f = ev.dataTransfer && ev.dataTransfer.files[0];
+      if (!f) return;
+      var fr = new FileReader();
+      fr.onload = function () { loadText(String(fr.result), f.name); };
+      fr.readAsText(f);
+    });
+
+    document.querySelectorAll('.seg[data-x]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        document.querySelectorAll('.seg[data-x]').forEach(function (o) { o.classList.toggle('on', o === b); });
+        if (S.stack) S.stack.setXMode(b.dataset.x);
+      });
+    });
+
+    $('zoomSel').addEventListener('click', function () { S.stack.zoomToSelection(); });
+    $('zoomReset').addEventListener('click', function () { S.stack.resetView(); });
+    $('clearSel').addEventListener('click', function () { S.stack.setSelection(null); });
+    $('mapFitAll').addEventListener('click', function () { S.map.fitBounds(S.map.bounds); });
+    $('mapFitView').addEventListener('click', function () {
+      var v = S.stack.viewIndices(); S.map.fitBounds(S.map.boundsOf(v.i0, v.i1));
+    });
+    $('mapFitSel').addEventListener('click', function () {
+      if (S.selection) S.map.fitBounds(S.map.boundsOf(S.selection.i0, S.selection.i1));
+    });
+    $('mapSelect').addEventListener('click', function () {
+      S.map.selectMode = !S.map.selectMode;
+      this.classList.toggle('on', S.map.selectMode);
+      $('map').style.cursor = S.map.selectMode ? 'crosshair' : 'grab';
+    });
+
+    $('mode').addEventListener('change', function () {
+      var m = $('mode').value;
+      $('fTarget').hidden = m !== 'target';
+      $('fFactor').hidden = m !== 'factor';
+      $('fDelta').hidden = m !== 'delta';
+      $('fSpeed').hidden = m !== 'speed';
+      updatePreview();
+    });
+    ['targetMin', 'targetSec', 'factor', 'delta2', 'speedTarget', 'maxSpeed', 'minSpeed', 'maxFactor', 'ramp', 'smooth']
+      .forEach(function (id) { $(id).addEventListener('input', updatePreview); });
+
+    $('apply').addEventListener('click', applyEdit);
+    $('resetParams').addEventListener('click', function () {
+      $('mode').value = 'target'; $('mode').dispatchEvent(new Event('change'));
+      $('targetMin').value = 1; $('targetSec').value = 0; $('factor').value = 1.1;
+      $('delta2').value = 3; $('speedTarget').value = 28; $('maxSpeed').value = 0;
+      $('minSpeed').value = 5; $('maxFactor').value = 2.5; $('ramp').value = 15; $('smooth').value = 10;
+      Object.keys(filterState).forEach(function (k) { filterState[k] = { on: false, min: '', max: '' }; });
+      buildFilterRows(); updatePreview();
+    });
+
+    ['optAlign', 'optPower', 'optHr'].forEach(function (id) { $(id).addEventListener('change', updateOverlay); });
+    ['optSpeedSmooth', 'optGradeWin', 'optPause'].forEach(function (id) {
+      $(id).addEventListener('change', function () {
+        if (!S.source) return;
+        var sel = S.selection, view = S.stack.viewIndices(), xmode = S.stack.xMode, edits = S.edits;
+        S.track = Track.build(S.source, analysisOpts());
+        S.stack.setTrack(S.track);
+        S.stack.xMode = xmode;
+        S.map.setTrack(S.track);
+        S.edits = edits;
+        S.stack.setView([S.stack.xArray()[view.i0], S.stack.xArray()[view.i1]]);
+        if (sel) S.stack.setSelectionIndices(sel.i0, sel.i1);
+        buildChannelChips(); renderEdits(); updateOverlay();
+      });
+    });
+
+    $('export').addEventListener('click', doExport);
+    $('modalClose').addEventListener('click', function () { $('modal').hidden = true; });
+    $('modal').addEventListener('click', function (ev) { if (ev.target === $('modal')) $('modal').hidden = true; });
+    $('help').addEventListener('click', showHelp);
+
+    document.addEventListener('keydown', function (ev) {
+      if (/input|select|textarea/i.test(ev.target.tagName)) return;
+      if (!S.track) return;
+      if (ev.key === 'z') S.stack.zoomToSelection();
+      else if (ev.key === 'r') S.stack.resetView();
+      else if (ev.key === 'Escape') { S.stack.setSelection(null); $('modal').hidden = true; }
+      else if (ev.key === 'Enter' && S.selection) applyEdit();
+      else if (ev.key === 'm') $('mapSelect').click();
+    });
+
+    // splitter
+    var sp = $('splitter'), dragging = false;
+    sp.addEventListener('pointerdown', function (ev) { dragging = true; sp.setPointerCapture(ev.pointerId); });
+    sp.addEventListener('pointermove', function (ev) {
+      if (!dragging) return;
+      var w = Math.max(300, Math.min(window.innerWidth - 360, window.innerWidth - ev.clientX));
+      document.querySelector('.right').style.width = w + 'px';
+    });
+    sp.addEventListener('pointerup', function () { dragging = false; if (S.stack) S.stack.resize(); if (S.map) S.map.resize(); });
+  }
+
+  function showHelp() {
+    $('modalTitle').textContent = 'Mode d’emploi';
+    $('modalBody').innerHTML =
+      '<h3>Graphes</h3><ul>' +
+      '<li><kbd>glisser</kbd> sélectionne un tronçon · <kbd>maj</kbd>+glisser déplace la vue</li>' +
+      '<li><kbd>molette</kbd> zoome, tous les graphes restent synchronisés</li>' +
+      '<li><kbd>double-clic</kbd> ou <kbd>r</kbd> : vue complète · <kbd>z</kbd> : zoom sur la sélection</li>' +
+      '<li>l’axe Y de chaque graphe s’adapte à la fenêtre visible, ou se fige avec « auto Y » décoché</li>' +
+      '<li>la bande du bas donne le profil complet et la position de la vue</li></ul>' +
+      '<h3>Carte</h3><ul>' +
+      '<li>la portion visible dans les graphes est tracée en bleu vif, la sélection en orange</li>' +
+      '<li>« Sélection sur la carte » (<kbd>m</kbd>) : glissez le long du tracé pour choisir un tronçon</li>' +
+      '<li><kbd>maj</kbd>+glisser inverse le mode en cours</li></ul>' +
+      '<h3>Retouche</h3><ul>' +
+      '<li>choisissez la consigne (temps à gagner, facteur, km/h, vitesse cible)</li>' +
+      '<li>les filtres restreignent la retouche à certains points (pente, vitesse, puissance, FC…) — ' +
+      'l’accélération n’est donc pas uniforme sur le tronçon</li>' +
+      '<li>« Appliquer » empile la modification ; vous pouvez enchaîner d’autres tronçons</li>' +
+      '<li>la courbe orange sur le graphe de vitesse montre le résultat</li></ul>' +
+      '<h3>Export</h3><p>Le fichier reprend la structure du GPX d’origine (mêmes extensions Garmin), ' +
+      'la même cadence d’enregistrement et les mêmes pauses. Les positions des portions retouchées sont ' +
+      'recalculées le long du tracé d’origine pour rester cohérentes avec les nouvelles vitesses, et le ' +
+      'fichier est vérifié avant téléchargement.</p>';
+    $('download').style.display = 'none';
+    $('modal').hidden = false;
+    var restore = function () { $('download').style.display = ''; $('modalClose').removeEventListener('click', restore); };
+    $('modalClose').addEventListener('click', restore);
+  }
+
+  wire();
+})();
+
+</script>
+</body>
+</html>
