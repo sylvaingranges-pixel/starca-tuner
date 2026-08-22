@@ -17,6 +17,19 @@ Deux possibilités :
 
 Le fichier unique se régénère après modification du code avec `node tools/build-single.js`.
 
+## Quel fichier donner à l'application ?
+
+| export | puissance | lu par l'app | remarque |
+| --- | --- | --- | --- |
+| **Strava → « Exporter GPX »** | **oui** (`<power>`) | oui | **le meilleur choix** : 1 Hz, puissance, FC, cadence, température, altitude |
+| Garmin Connect → « Exporter au format GPX » | non | oui | l'extension Garmin `TrackPointExtension v1` ne transporte que `atemp`, `hr` et `cad` : la puissance n'y est jamais, même avec un capteur |
+| Strava / Garmin → fichier original `.fit` | oui | non | format binaire ; contient en plus la respiration, l'équilibre G/D, l'efficacité de pédalage, les tours… |
+
+Autrement dit : si votre sortie a été enregistrée avec un capteur de puissance, exportez-la
+**depuis Strava en GPX** — c'est le même enregistrement à 1 Hz que le GPX Garmin, avec la
+puissance en plus. Le graphe « Puissance » apparaît alors automatiquement et devient
+utilisable comme filtre de retouche.
+
 ## Ce que fait l'application
 
 1. **Import** d'un GPX Garmin Connect / Strava. Tous les champs présents dans le fichier
@@ -63,8 +76,9 @@ Le tracé (la polyligne) et la cadence d'enregistrement sont des invariants ; se
   la même structure d'extensions XML que le fichier d'entrée. Deux options recalculent
   **puissance** et **fréquence cardiaque** en cohérence avec la nouvelle vitesse, à partir d'un
   modèle physique paramétrable (masse, SCx, Crr) ;
-* sans aucune modification, l'export est **identique au fichier d'entrée**, octet pour octet,
-  sur l'ensemble des points de trace.
+* sans aucune modification, l'export est **identique au fichier d'entrée**, octet pour octet —
+  y compris l'en-tête, les espaces de noms, le style d'indentation, la précision des altitudes
+  et le découpage en `<trkseg>` (vérifié sur les exports Garmin Connect et Strava).
 
 La distance totale est conservée à ~0,05 % près (le ré-échantillonnage lisse très légèrement
 le bruit GPS dans les portions retouchées).

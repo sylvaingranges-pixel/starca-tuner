@@ -503,8 +503,9 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
   }
 
   /** Serialize a node back to XML with 2-space indentation. */
-  function serialize(node, indent) {
+  function serialize(node, indent, unit) {
     indent = indent || '';
+    unit = unit == null ? '  ' : unit;
     if (node.name === '#text') return indent + encodeEntities(node.text.trim()) + '\n';
     var open = '<' + node.name;
     for (var i = 0; i < node.attrs.length; i++) open += ' ' + node.attrs[i].name + '="' + encodeAttr(node.attrs[i].value) + '"';
@@ -514,7 +515,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
       return indent + open + '>' + encodeEntities(kids[0].text.trim()) + '</' + node.name + '>\n';
     }
     var out = indent + open + '>\n';
-    for (var j = 0; j < kids.length; j++) out += serialize(kids[j], indent + '  ');
+    for (var j = 0; j < kids.length; j++) out += serialize(kids[j], indent + unit, unit);
     return out + indent + '</' + node.name + '>\n';
   }
 
@@ -610,6 +611,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
         }
         if (timeS) { if (/\.\d+/.test(timeS)) withMillis++; else withoutMillis++; }
         points.push({
+          seg: s,
           lat: lat, lon: lon, rawLat: latS, rawLon: lonS,
           ele: eleS === null ? NaN : parseFloat(eleS), rawEle: eleS,
           timeMs: parseTimeMs(timeS), ext: ext, other: other
@@ -656,6 +658,31 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
 
     var trkMeta = X.children(trk).filter(function (c) { return X.localName(c.name) !== 'trkseg'; });
 
+    // Reproduce the indentation style of the input (2 spaces for Garmin
+    // Connect, 1 for Strava) and its <ele> precision.
+    // Keep the opening <gpx …> tag verbatim: it carries the namespace
+    // declarations and each exporter wraps them its own way.
+    var rootTag = /<gpx[\s\S]*?>/.exec(text);
+    var rootRaw = null;
+    if (rootTag && (rootTag[0].split('"').length - 1) % 2 === 0) rootRaw = rootTag[0];
+
+    var indentUnit = '  ';
+    var m = /\n([ \t]*)<trkpt[\s>]/.exec(text);
+    if (m) {
+      var lead = m[1];
+      if (lead.length === 0) indentUnit = '';
+      else if (lead[0] === '\t') indentUnit = '\t';
+      else indentUnit = ' '.repeat(Math.max(1, Math.round(lead.length / 3)));
+    }
+    var eleDecimals = 0;
+    for (var ed = 0; ed < Math.min(points.length, 300); ed++) {
+      var re = points[ed].rawEle;
+      if (!re) continue;
+      var dot = re.indexOf('.');
+      if (dot >= 0) eleDecimals = Math.max(eleDecimals, re.length - dot - 1);
+    }
+    eleDecimals = Math.min(eleDecimals, 3);
+
     return {
       declaration: root.declaration || '<?xml version="1.0" encoding="UTF-8"?>',
       rootAttrs: root.attrs.slice(),
@@ -670,6 +697,9 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
       extOrder: extLeafOrder,
       extMeta: extMeta,
       otherOrder: otherLeafOrder,
+      indentUnit: indentUnit,
+      rootRaw: rootRaw,
+      eleDecimals: eleDecimals,
       timeMillis: withMillis >= withoutMillis
     };
   }
@@ -686,7 +716,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
     return s === '-0' ? '0' : s;
   }
 
-  function buildExtensionsXML(point, source, indent) {
+  function buildExtensionsXML(point, source, indent, unit) {
     // Rebuild the original nesting (e.g. ns3:TrackPointExtension > ns3:hr).
     var order = source.extOrder, meta = source.extMeta;
     var lines = [];
@@ -697,7 +727,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
     function closeTo(depth) {
       while (openStack.length > depth) {
         var name = openStack.pop();
-        body += indent + '  ' + '  '.repeat(openStack.length) + '</' + name + '>\n';
+        body += indent + unit + unit.repeat(openStack.length) + '</' + name + '>\n';
       }
     }
 
@@ -712,7 +742,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
       while (common < openStack.length && common < path.length - 1 && openStack[common] === path[common]) common++;
       closeTo(common);
       for (var d = common; d < path.length - 1; d++) {
-        body += indent + '  ' + '  '.repeat(openStack.length) + '<' + path[d] + '>\n';
+        body += indent + unit + unit.repeat(openStack.length) + '<' + path[d] + '>\n';
         openStack.push(path[d]);
       }
       var value = raw;
@@ -721,7 +751,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
         value = m.integer ? String(Math.round(f)) : f.toFixed(m.decimals || 1);
         if (!m.integer && m.decimals === 0) value = String(Math.round(f));
       }
-      body += indent + '  ' + '  '.repeat(openStack.length) + '<' + path[path.length - 1] + '>' +
+      body += indent + unit + unit.repeat(openStack.length) + '<' + path[path.length - 1] + '>' +
         X.encodeEntities(value) + '</' + path[path.length - 1] + '>\n';
       emitted = true;
     }
@@ -735,44 +765,51 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
   function build(source, points, options) {
     options = options || {};
     var out = [];
+    var unit = source.indentUnit == null ? '  ' : source.indentUnit;
+    var ind = function (d) { return unit.repeat(d); };
     out.push(source.declaration);
-    out.push('\n<gpx');
-    for (var a = 0; a < source.rootAttrs.length; a++) {
-      out.push((a === 0 ? ' ' : '\n  ') + source.rootAttrs[a].name + '="' + X.encodeAttr(source.rootAttrs[a].value) + '"');
+    if (source.rootRaw) {
+      out.push('\n' + source.rootRaw + '\n');
+    } else {
+      out.push('\n<gpx');
+      for (var a = 0; a < source.rootAttrs.length; a++) {
+        out.push(' ' + source.rootAttrs[a].name + '="' + X.encodeAttr(source.rootAttrs[a].value) + '"');
+      }
+      out.push('>\n');
     }
-    out.push('>\n');
 
-    if (source.metadataNode) out.push(X.serialize(source.metadataNode, '  '));
-    var trkOpen = '  <trk';
+    if (source.metadataNode) out.push(X.serialize(source.metadataNode, ind(1), unit));
+    var trkOpen = ind(1) + '<trk';
     for (var b = 0; b < source.trkAttrs.length; b++) trkOpen += ' ' + source.trkAttrs[b].name + '="' + X.encodeAttr(source.trkAttrs[b].value) + '"';
     out.push(trkOpen + '>\n');
-    for (var c = 0; c < source.trkMeta.length; c++) out.push(X.serialize(source.trkMeta[c], '    '));
-    out.push('    <trkseg>\n');
+    for (var c = 0; c < source.trkMeta.length; c++) out.push(X.serialize(source.trkMeta[c], ind(2), unit));
+    out.push(ind(2) + '<trkseg>\n');
 
     var millis = source.timeMillis;
     var curSeg = points.length ? (points[0].seg || 0) : 0;
     for (var i = 0; i < points.length; i++) {
       var p = points[i];
       var pseg = p.seg || 0;
-      if (pseg !== curSeg) { out.push('    </trkseg>\n    <trkseg>\n'); curSeg = pseg; }
+      if (pseg !== curSeg) { out.push(ind(2) + '</trkseg>\n' + ind(2) + '<trkseg>\n'); curSeg = pseg; }
       var latS = p.rawLat !== undefined && p.rawLat !== null ? p.rawLat : trimNum(p.lat, 9);
       var lonS = p.rawLon !== undefined && p.rawLon !== null ? p.rawLon : trimNum(p.lon, 9);
-      out.push('      <trkpt lat="' + latS + '" lon="' + lonS + '">\n');
+      out.push(ind(3) + '<trkpt lat="' + latS + '" lon="' + lonS + '">\n');
       if (isFinite(p.ele)) {
-        out.push('        <ele>' + (p.rawEle != null ? p.rawEle : trimNum(p.ele, 2)) + '</ele>\n');
+        var eleTxt = p.rawEle != null ? p.rawEle : trimNum(p.ele, source.eleDecimals == null ? 2 : source.eleDecimals);
+        out.push(ind(4) + '<ele>' + eleTxt + '</ele>\n');
       }
-      out.push('        <time>' + fmtTime(p.timeMs, millis) + '</time>\n');
+      out.push(ind(4) + '<time>' + fmtTime(p.timeMs, millis) + '</time>\n');
       for (var o = 0; o < source.otherOrder.length; o++) {
         var on = source.otherOrder[o];
         if (p.other && p.other[on] !== undefined && p.other[on] !== '') {
-          out.push('        <' + on + '>' + X.encodeEntities(p.other[on]) + '</' + on + '>\n');
+          out.push(ind(4) + '<' + on + '>' + X.encodeEntities(p.other[on]) + '</' + on + '>\n');
         }
       }
-      out.push(buildExtensionsXML(p, source, '        '));
-      out.push('      </trkpt>\n');
+      out.push(buildExtensionsXML(p, source, ind(4), unit));
+      out.push(ind(3) + '</trkpt>\n');
     }
 
-    out.push('    </trkseg>\n  </trk>\n</gpx>\n');
+    out.push(ind(2) + '</trkseg>\n' + ind(1) + '</trk>\n</gpx>\n');
     return out.join('');
   }
 

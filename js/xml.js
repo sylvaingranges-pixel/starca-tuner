@@ -158,8 +158,9 @@
   }
 
   /** Serialize a node back to XML with 2-space indentation. */
-  function serialize(node, indent) {
+  function serialize(node, indent, unit) {
     indent = indent || '';
+    unit = unit == null ? '  ' : unit;
     if (node.name === '#text') return indent + encodeEntities(node.text.trim()) + '\n';
     var open = '<' + node.name;
     for (var i = 0; i < node.attrs.length; i++) open += ' ' + node.attrs[i].name + '="' + encodeAttr(node.attrs[i].value) + '"';
@@ -169,7 +170,7 @@
       return indent + open + '>' + encodeEntities(kids[0].text.trim()) + '</' + node.name + '>\n';
     }
     var out = indent + open + '>\n';
-    for (var j = 0; j < kids.length; j++) out += serialize(kids[j], indent + '  ');
+    for (var j = 0; j < kids.length; j++) out += serialize(kids[j], indent + unit, unit);
     return out + indent + '</' + node.name + '>\n';
   }
 
