@@ -2,345 +2,289 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- Starca Tuner (bureau) — fichier unique, ouvrez-le dans un navigateur. -->
-<title>Starca Tuner — retouche de sorties vélo Garmin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#070c12">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- Starca Tuner (smartphone) — fichier unique, ouvrez-le dans un navigateur. -->
+<title>Starca Tuner — mobile</title>
 <style>
 :root {
-  --bg: #070c12;
-  --panel: #0d141c;
-  --panel2: #111b25;
-  --line: #1c2733;
-  --text: #dbe7f3;
-  --dim: #7b8fa3;
-  --accent: #38bdf8;
-  --warm: #f59e0b;
-  --ok: #22c55e;
-  --err: #ef4444;
+  --bg: #070c12; --panel: #0d141c; --panel2: #111b25; --line: #1c2733;
+  --text: #dbe7f3; --dim: #8299ad; --accent: #38bdf8; --warm: #f59e0b;
+  --ok: #22c55e; --err: #ef4444;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
 }
-* { box-sizing: border-box; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 [hidden] { display: none !important; }
-html, body { height: 100%; margin: 0; }
-body {
+html, body {
+  height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none;
   background: var(--bg); color: var(--text);
-  font: 13px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  display: flex; flex-direction: column; overflow: hidden;
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
-h1 { font-size: 22px; margin: 0 0 12px; }
-h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--dim); margin: 0 0 10px; }
-h3 { font-size: 12px; margin: 16px 0 6px; color: var(--text); }
+body { display: flex; flex-direction: column; }
 button, input, select { font: inherit; color: inherit; }
+h1 { font-size: 20px; margin: 0 0 10px; }
+h2 { font-size: 15px; margin: 0; }
+h3 { font-size: 13px; margin: 14px 0 6px; color: var(--dim); text-transform: uppercase; letter-spacing: .06em; }
+.dim { color: var(--dim); }
+.grow { flex: 1; }
 
-/* ---------- top bar ---------- */
-.topbar {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line);
-  flex: none;
+/* ---------------- header ---------------- */
+.bar {
+  flex: none; display: flex; align-items: center; gap: 10px;
+  padding: calc(6px + var(--safe-t)) 10px 6px; background: var(--panel);
+  border-bottom: 1px solid var(--line);
 }
-.brand { font-weight: 700; letter-spacing: .04em; color: var(--accent); }
-.activity { color: var(--dim); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.activity b { color: var(--text); font-weight: 600; }
-.delta { font-size: 12px; color: var(--warm); white-space: nowrap; }
-.spacer { flex: 1; }
-
-.btn {
-  background: var(--panel2); border: 1px solid var(--line); color: var(--text);
-  padding: 6px 11px; border-radius: 6px; cursor: pointer; white-space: nowrap;
+.titlebox { flex: 1; min-width: 0; }
+#title { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sub { font-size: 11px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.iconbtn {
+  flex: none; width: 40px; height: 40px; border-radius: 10px;
+  background: var(--panel2); border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
 }
-.btn:hover:not(:disabled) { border-color: #2f4457; background: #16232f; }
-.btn:disabled { opacity: .4; cursor: default; }
-.btn.primary { background: #12405a; border-color: #17618a; }
-.btn.accent { background: #1d4ed8; border-color: #2563eb; color: #fff; }
-.btn.accent:hover { background: #2563eb; }
-.btn.ghost { background: transparent; }
-.btn.small { padding: 3px 8px; font-size: 12px; }
-.seg { background: var(--panel2); border: 1px solid var(--line); padding: 3px 10px; cursor: pointer; }
-.seg:first-of-type { border-radius: 6px 0 0 6px; }
-.seg:last-of-type { border-radius: 0 6px 6px 0; border-left: none; }
-.seg.on { background: #12405a; border-color: #17618a; color: #fff; }
+.iconbtn svg { width: 22px; height: 22px; fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linejoin: round; }
 
-/* ---------- layout ---------- */
-.layout { flex: 1; display: flex; min-height: 0; }
-.left { flex: 1; min-width: 320px; display: flex; flex-direction: column; min-height: 0; }
-.right { width: 430px; flex: none; display: flex; flex-direction: column; border-left: 1px solid var(--line); min-height: 0; }
-.splitter { width: 5px; cursor: col-resize; background: var(--line); flex: none; }
-.splitter:hover { background: #2f4457; }
-
+/* ---------------- toolbar ---------------- */
 .toolbar {
-  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--panel); flex: none;
+  flex: none; display: flex; align-items: center; gap: 6px; padding: 5px 8px;
+  background: var(--panel); border-bottom: 1px solid var(--line);
+  overflow-x: auto; scrollbar-width: none;
 }
-.toolbar .grp { display: flex; align-items: center; gap: 6px; }
-.toolbar .lbl { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
-.hint { color: #4d6070; font-size: 11px; }
-.chips { display: flex; gap: 4px; flex-wrap: wrap; }
-.chip {
-  border: 1px solid var(--line); background: var(--panel2); color: var(--dim);
-  border-radius: 20px; padding: 2px 9px; font-size: 11px; cursor: pointer;
+.toolbar::-webkit-scrollbar { display: none; }
+.seg2 { display: flex; flex: none; }
+.seg {
+  background: var(--panel2); border: 1px solid var(--line); color: var(--dim);
+  padding: 6px 12px; font-size: 13px; cursor: pointer;
 }
-.chip.on { color: var(--text); border-color: #2f4457; }
-.chip .cdot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: middle; opacity: .35; }
-.chip.on .cdot { opacity: 1; }
+.seg:first-child { border-radius: 8px 0 0 8px; }
+.seg:last-child { border-radius: 0 8px 8px 0; border-left: none; }
+.seg.on { background: #12405a; border-color: #17618a; color: #fff; }
+.tb {
+  flex: none; background: var(--panel2); border: 1px solid var(--line); color: var(--text);
+  padding: 6px 10px; border-radius: 8px; font-size: 13px; cursor: pointer;
+}
+.tb:disabled { opacity: .38; }
+.gain {
+  flex: none; color: var(--warm); font-size: 12px; white-space: nowrap;
+  position: sticky; right: 0; background: var(--panel); padding: 4px 2px 4px 10px;
+  max-width: 42vw; overflow: hidden; text-overflow: ellipsis;
+  box-shadow: -8px 0 8px -6px var(--panel);
+}
 
-.charts { flex: 1; overflow-y: auto; overflow-x: hidden; padding-bottom: 4px; }
-.empty { padding: 40px; max-width: 620px; color: var(--dim); }
-.empty p { margin: 0 0 12px; }
-.empty b { color: var(--text); }
-.empty .dim { color: #4d6070; font-size: 12px; }
+/* ---------------- map ---------------- */
+.mapwrap { flex: none; height: 28%; position: relative; min-height: 0; }
+#map { display: block; width: 100%; height: 100%; touch-action: none; }
+.mapctl { position: absolute; top: 6px; left: 6px; right: 6px; display: flex; gap: 5px; flex-wrap: wrap; }
+.mb {
+  background: rgba(13,20,28,.85); border: 1px solid var(--line); color: var(--text);
+  padding: 5px 9px; border-radius: 8px; font-size: 12px; cursor: pointer;
+}
+.mb:disabled { opacity: .4; }
+.mb.on { background: #b45309; border-color: var(--warm); color: #fff; }
+select.mb { max-width: 40vw; }
+.grabber {
+  flex: none; height: 16px; background: var(--panel); border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center; touch-action: none; cursor: row-resize;
+}
+.grabber span { width: 44px; height: 4px; border-radius: 2px; background: #2f4457; }
 
-/* ---------- charts ---------- */
+/* ---------------- charts ---------------- */
+.charts { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+.chartfoot { flex: none; background: var(--panel); border-top: 1px solid var(--line); }
 .chart-row { border-bottom: 1px solid #131c25; }
 .chart-head {
-  display: flex; align-items: center; gap: 6px; padding: 3px 8px 3px 10px;
-  font-size: 11px; color: var(--dim); background: #0a1017;
+  display: flex; align-items: center; gap: 6px; padding: 2px 8px; font-size: 11px;
+  color: var(--dim); background: #0a1017;
 }
 .chart-head .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .chart-head .lbl { color: var(--text); font-weight: 600; }
-.chart-head .cursor-val { color: var(--accent); font-family: ui-monospace, monospace; min-width: 48px; }
+.chart-head .cursor-val { color: var(--accent); font-family: ui-monospace, monospace; }
 .chart-head .spacer { flex: 1; }
-.chart-head input[type=number] { width: 58px; background: #0d151d; border: 1px solid var(--line); border-radius: 4px; padding: 1px 4px; font-size: 11px; }
-.chart-head input[type=number]:disabled { opacity: .35; }
-.chart-head .yauto { display: flex; align-items: center; gap: 3px; cursor: pointer; }
-.chart-head .hidebtn { background: none; border: none; color: var(--dim); cursor: pointer; padding: 0 2px; }
-.chart-head .hidebtn:hover { color: var(--err); }
-.chart-row canvas { display: block; width: 100%; height: 108px; cursor: crosshair; touch-action: none; }
+.chart-row canvas { display: block; width: 100%; height: 92px; touch-action: none; }
 .chart-axis canvas { display: block; width: 100%; height: 18px; }
-.chart-footer-wrap { flex: none; background: var(--panel); border-top: 1px solid var(--line); }
-.chart-overview { border-top: 1px solid var(--line); }
-.chart-overview canvas { display: block; width: 100%; height: 42px; cursor: grab; touch-action: none; }
+.chart-overview canvas { display: block; width: 100%; height: 34px; touch-action: none; }
 
-/* ---------- map ---------- */
-.mapwrap { position: relative; height: 44%; min-height: 220px; flex: none; border-bottom: 1px solid var(--line); }
-#map { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
-.mapctl {
-  position: absolute; top: 8px; left: 8px; right: 8px;
-  display: flex; gap: 5px; flex-wrap: wrap; align-items: center;
+.empty { position: absolute; inset: 92px 0 auto; padding: 24px 18px; color: var(--dim); pointer-events: none; }
+.empty p { margin: 0 0 12px; }
+.empty h1 { color: var(--text); }
+
+/* ---------------- bottom tabs ---------------- */
+.tabs {
+  flex: none; display: flex; background: var(--panel); border-top: 1px solid var(--line);
+  padding-bottom: var(--safe-b);
 }
-.mapctl .btn, .mapctl .sel { backdrop-filter: blur(4px); background: rgba(13,20,28,.82); }
-.mapctl .btn.on { background: #b45309; border-color: var(--warm); color: #fff; }
-.sel { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; font-size: 12px; }
+.tab {
+  flex: 1; background: none; border: none; padding: 8px 4px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 1px; color: var(--dim);
+  border-right: 1px solid var(--line);
+}
+.tab:last-child { border-right: none; }
+.tab b { font-size: 13px; color: var(--text); font-weight: 600; }
+.tab span { font-size: 10px; }
+.tab:disabled { opacity: .4; }
+.tab.accent b { color: #7dd3fc; }
 
-/* ---------- panel ---------- */
-.panel { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
-.badge { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 0 6px; color: var(--text); }
-.kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 12px; }
+/* ---------------- bottom sheet ---------------- */
+.scrim { position: fixed; inset: 0; background: rgba(3,7,11,.6); z-index: 20; }
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 21;
+  max-height: 88vh; display: flex; flex-direction: column;
+  background: var(--panel); border-top: 1px solid var(--line);
+  border-radius: 16px 16px 0 0; box-shadow: 0 -8px 24px rgba(0,0,0,.5);
+  padding-bottom: var(--safe-b);
+}
+.sheethead {
+  flex: none; display: flex; align-items: center; gap: 10px; padding: 6px 12px 8px;
+  border-bottom: 1px solid var(--line); position: relative;
+}
+.sheethead h2 { flex: 1; }
+.pull { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 40px; height: 4px; border-radius: 2px; background: #2f4457; }
+.sheetbody { overflow-y: auto; padding: 12px; -webkit-overflow-scrolling: touch; }
+
+/* ---------------- forms ---------------- */
+.field { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+.field > label { flex: 1; color: var(--dim); font-size: 13px; }
+.field .val { display: flex; align-items: center; gap: 6px; }
+.num {
+  width: 84px; background: #0a1119; border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px; text-align: right;
+}
+.u { color: var(--dim); font-size: 12px; min-width: 34px; }
+select.sel {
+  width: 100%; background: var(--panel2); border: 1px solid var(--line);
+  border-radius: 8px; padding: 10px;
+}
+.btn {
+  background: var(--panel2); border: 1px solid var(--line); color: var(--text);
+  padding: 11px 14px; border-radius: 10px; cursor: pointer; font-size: 14px;
+}
+.btn.accent { background: #1d4ed8; border-color: #2563eb; color: #fff; width: 100%; font-weight: 600; }
+.btn.wide { width: 100%; }
+.btn:disabled { opacity: .4; }
+.row2 { display: flex; gap: 8px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 13px; }
 .kv span:nth-child(odd) { color: var(--dim); }
-.kv b { font-weight: 600; font-family: ui-monospace, monospace; }
-.dim { color: var(--dim); }
+.kv b { font-family: ui-monospace, monospace; font-weight: 600; }
 
-.field { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
-.field > label { width: 150px; flex: none; color: var(--dim); font-size: 12px; }
-.field .row { display: flex; align-items: center; gap: 5px; flex: 1; }
-.field.checks { flex-direction: column; align-items: flex-start; gap: 3px; }
-.num { width: 74px; background: #0a1119; border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; }
-.u { color: var(--dim); font-size: 11px; }
-.chk { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; }
-.sel { width: 100%; }
-.field .sel { flex: 1; }
+.chk { display: flex; align-items: center; gap: 10px; padding: 9px 0; cursor: pointer; }
+.chk input { width: 20px; height: 20px; flex: none; accent-color: var(--accent); }
 
-.filters { display: flex; flex-direction: column; gap: 3px; }
-.frow { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 2px 0; }
-.frow > label { flex: 1; display: flex; align-items: center; gap: 6px; cursor: pointer; }
-.frow .fdot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
-.frow input[type=number] { width: 60px; background: #0a1119; border: 1px solid var(--line); border-radius: 5px; padding: 2px 5px; font-size: 12px; }
+.frow { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #131c25; }
+.frow .fname { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.frow .fdot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.frow .fnamet { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.frow .frange { font-size: 10px; color: #56697c; font-family: ui-monospace, monospace; }
+.frow input[type=number] { width: 62px; background: #0a1119; border: 1px solid var(--line); border-radius: 8px; padding: 7px 6px; text-align: right; font-size: 13px; }
 .frow input[type=number]:disabled { opacity: .3; }
-.frow .rng { color: #46596b; font-size: 10px; width: 92px; text-align: right; font-family: ui-monospace, monospace; }
+.frow input[type=checkbox] { width: 20px; height: 20px; flex: none; accent-color: var(--accent); }
 
-.adv { margin: 8px 0; border-top: 1px solid var(--line); padding-top: 6px; }
-.adv summary { cursor: pointer; color: var(--dim); font-size: 12px; }
-.preview {
-  margin: 10px 0 8px; padding: 8px 10px; border-radius: 6px;
-  background: #0a1119; border: 1px solid var(--line); font-size: 12px; line-height: 1.6;
-}
+.crow { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid #131c25; }
+.crow .cname { flex: 1; display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.crow .cdot { width: 9px; height: 9px; border-radius: 50%; }
+.crow input[type=number] { width: 62px; background: #0a1119; border: 1px solid var(--line); border-radius: 8px; padding: 7px 6px; text-align: right; font-size: 13px; }
+.crow input[type=number]:disabled { opacity: .3; }
+.crow input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); }
+
+.preview { margin: 12px 0; padding: 10px 12px; border-radius: 10px; background: #0a1119; border: 1px solid var(--line); font-size: 13px; line-height: 1.7; }
 .preview b { font-family: ui-monospace, monospace; color: var(--warm); }
-.preview .warn { color: var(--warm); }
-.actions { display: flex; gap: 8px; align-items: center; }
+.preview .warn, .warn { color: var(--warm); }
+.err { color: var(--err); }
+.ok { color: var(--ok); }
 
-.editlist { display: flex; flex-direction: column; gap: 6px; }
-.erow { display: flex; align-items: center; gap: 6px; padding: 5px 6px; background: #0a1119; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; }
+.erow { display: flex; align-items: center; gap: 8px; padding: 9px 8px; background: #0a1119; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; }
 .erow.off { opacity: .45; }
-.erow .etxt { flex: 1; min-width: 0; }
+.erow .etxt { flex: 1; min-width: 0; font-size: 13px; }
 .erow .etxt b { color: var(--warm); font-family: ui-monospace, monospace; }
-.erow .esub { color: var(--dim); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.erow button { background: none; border: none; color: var(--dim); cursor: pointer; padding: 2px 4px; border-radius: 4px; }
-.erow button:hover { color: var(--text); background: var(--panel2); }
+.erow .esub { font-size: 11px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.erow button { background: none; border: none; color: var(--dim); font-size: 17px; padding: 6px; cursor: pointer; }
 
-/* ---------- modal ---------- */
-.modal { position: fixed; inset: 0; background: rgba(3,7,11,.75); display: flex; align-items: center; justify-content: center; z-index: 50; }
-.modal-box { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; width: min(680px, 92vw); max-height: 86vh; overflow: auto; }
-.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
-.modal .ok { color: var(--ok); }
-.modal .err { color: var(--err); }
-.modal .warn { color: var(--warm); }
-.modal ul { margin: 6px 0; padding-left: 20px; }
-.modal table { border-collapse: collapse; width: 100%; font-size: 12px; margin: 8px 0; }
-.modal td { padding: 3px 6px; border-bottom: 1px solid var(--line); }
-.modal td:first-child { color: var(--dim); }
-.modal td b { font-family: ui-monospace, monospace; }
-kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font-size: 11px; font-family: ui-monospace, monospace; }
+table.rep { border-collapse: collapse; width: 100%; font-size: 13px; }
+table.rep td { padding: 6px 4px; border-bottom: 1px solid var(--line); }
+table.rep td:first-child { color: var(--dim); }
+table.rep b { font-family: ui-monospace, monospace; }
+ul.msgs { margin: 8px 0; padding-left: 20px; font-size: 13px; }
+
+/* ---------------- landscape: map beside the charts ---------------- */
+@media (orientation: landscape) and (max-height: 560px) {
+  body { display: grid; grid-template-columns: 40% 1fr; grid-template-rows: auto auto 1fr auto auto; }
+  .bar { grid-column: 1 / -1; }
+  .toolbar { grid-column: 1 / -1; }
+  .mapwrap { grid-row: 3 / span 2; height: auto; border-right: 1px solid var(--line); }
+  .grabber { display: none; }
+  .charts { grid-column: 2; grid-row: 3; }
+  .chartfoot { grid-column: 2; grid-row: 4; }
+  .tabs { grid-column: 1 / -1; }
+}
 
 </style>
 </head>
 <body>
-<header class="topbar">
-  <div class="brand">Starca&nbsp;Tuner</div>
-  <label class="btn primary">
-    Ouvrir un GPX…
+
+<header class="bar">
+  <label class="iconbtn" aria-label="Ouvrir un fichier GPX">
+    <svg viewBox="0 0 24 24"><path d="M4 6h6l2 2h8v10H4z"/></svg>
     <input type="file" id="file" accept=".gpx,application/gpx+xml" hidden>
   </label>
-  <div id="activity" class="activity"></div>
-  <div class="spacer"></div>
-  <div id="delta" class="delta"></div>
-  <button id="export" class="btn accent" disabled>Exporter le GPX…</button>
-  <button id="help" class="btn ghost" title="Aide">?</button>
+  <div class="titlebox">
+    <div id="title">Starca Tuner</div>
+    <div id="sub">Ouvrez un GPX exporté de Strava ou de Garmin Connect</div>
+  </div>
+  <button class="iconbtn" id="btnHelp" aria-label="Aide">?</button>
 </header>
 
-<main id="main" class="layout">
-  <section class="left">
-    <div class="toolbar">
-      <span class="grp">
-        <span class="lbl">Axe X</span>
-        <button class="seg on" data-x="time">Temps</button><button class="seg" data-x="dist">Distance</button>
-      </span>
-      <span class="grp">
-        <button id="zoomSel" class="btn small" disabled>Zoom sur la sélection</button>
-        <button id="zoomReset" class="btn small">Vue complète</button>
-        <button id="clearSel" class="btn small" disabled>Effacer la sélection</button>
-      </span>
-      <span class="grp">
-        <span class="lbl">Graphes</span>
-        <span id="chanToggles" class="chips"></span>
-      </span>
-      <span class="spacer"></span>
-      <span class="hint">glisser&nbsp;: sélectionner · molette&nbsp;: zoom · maj+glisser&nbsp;: déplacer · double-clic&nbsp;: vue complète</span>
-    </div>
-    <div id="charts" class="charts"></div>
-    <div id="chartFooter" class="chart-footer-wrap"></div>
-    <div id="empty" class="empty">
-      <h1>Retouche de sorties vélo</h1>
-      <p>Ouvrez un fichier <b>GPX</b> exporté de Garmin Connect ou de Strava&nbsp;: toutes les séries
-         temporelles du fichier s’affichent, synchronisées avec la carte.</p>
-      <p>Sélectionnez un tronçon (dans un graphe ou sur la carte), filtrez les points à retoucher
-         (pente, vitesse, puissance…), fixez le temps à gagner, puis exportez un GPX rejouable dans Strava.</p>
-      <p class="dim">Tout se passe dans votre navigateur&nbsp;: aucun fichier n’est envoyé sur un serveur.
-         Seules les tuiles du fond de carte sont téléchargées.</p>
-    </div>
-  </section>
-
-  <div id="splitter" class="splitter"></div>
-
-  <section class="right">
-    <div class="mapwrap">
-      <canvas id="map"></canvas>
-      <div class="mapctl">
-        <select id="tileSource" class="sel" title="Fond de carte"></select>
-        <button id="mapSelect" class="btn small" title="Sélectionner un tronçon en glissant le long du tracé">Sélection sur la carte</button>
-        <button id="mapFitAll" class="btn small">Tout</button>
-        <button id="mapFitView" class="btn small">Vue</button>
-        <button id="mapFitSel" class="btn small" disabled>Sélection</button>
-      </div>
-    </div>
-
-    <div class="panel" id="panel">
-      <div class="card">
-        <h2>Tronçon sélectionné</h2>
-        <div id="selInfo" class="kv dim">Aucune sélection. Glissez dans un graphe, ou activez «&nbsp;Sélection sur la carte&nbsp;».</div>
-      </div>
-
-      <div class="card" id="editCard" hidden>
-        <h2>Accélérer ce tronçon</h2>
-
-        <div class="field">
-          <label>Consigne</label>
-          <select id="mode" class="sel">
-            <option value="target">Gagner un temps donné sur le tronçon</option>
-            <option value="factor">Multiplier la vitesse par un facteur</option>
-            <option value="delta">Ajouter des km/h</option>
-            <option value="speed">Viser une vitesse minimale</option>
-          </select>
-        </div>
-        <div class="field" id="fTarget">
-          <label>Temps à gagner</label>
-          <div class="row">
-            <input id="targetMin" type="number" min="0" step="1" value="1" class="num"><span class="u">min</span>
-            <input id="targetSec" type="number" min="0" max="59" step="1" value="0" class="num"><span class="u">s</span>
-          </div>
-        </div>
-        <div class="field" id="fFactor" hidden>
-          <label>Facteur de vitesse</label>
-          <div class="row"><span class="u">×</span><input id="factor" type="number" min="0.3" max="3" step="0.01" value="1.10" class="num"></div>
-        </div>
-        <div class="field" id="fDelta" hidden>
-          <label>Supplément de vitesse</label>
-          <div class="row"><span class="u">+</span><input id="delta2" type="number" step="0.5" value="3" class="num"><span class="u">km/h</span></div>
-        </div>
-        <div class="field" id="fSpeed" hidden>
-          <label>Vitesse minimale visée</label>
-          <div class="row"><input id="speedTarget" type="number" step="0.5" value="28" class="num"><span class="u">km/h</span></div>
-        </div>
-
-        <h3>Filtres — quels points accélérer&nbsp;?</h3>
-        <div id="filters" class="filters"></div>
-
-        <details class="adv">
-          <summary>Réglages fins</summary>
-          <div class="field"><label>Vitesse à ne pas dépasser</label>
-            <div class="row"><input id="maxSpeed" type="number" step="1" value="0" class="num"><span class="u">km/h (0 = libre)</span></div></div>
-          <div class="field"><label>Ne pas toucher en dessous de</label>
-            <div class="row"><input id="minSpeed" type="number" step="1" value="5" class="num"><span class="u">km/h</span></div></div>
-          <div class="field"><label>Facteur maximal autorisé</label>
-            <div class="row"><span class="u">×</span><input id="maxFactor" type="number" step="0.1" value="2.5" class="num"></div></div>
-          <div class="field"><label>Transition aux extrémités</label>
-            <div class="row"><input id="ramp" type="number" step="1" value="15" class="num"><span class="u">s</span></div></div>
-          <div class="field"><label>Lissage du facteur</label>
-            <div class="row"><input id="smooth" type="number" step="1" value="10" class="num"><span class="u">s</span></div></div>
-        </details>
-
-        <div id="preview" class="preview"></div>
-        <div class="actions">
-          <button id="apply" class="btn accent">Appliquer au tronçon</button>
-          <button id="resetParams" class="btn ghost small">Valeurs par défaut</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>Modifications <span id="editCount" class="badge">0</span></h2>
-        <div id="editList" class="editlist dim">Aucune modification appliquée.</div>
-        <div class="field checks">
-          <label class="chk"><input type="checkbox" id="optAlign" checked> Caler le gain sur la seconde entière</label>
-          <label class="chk"><input type="checkbox" id="optPower"> Recalculer la puissance</label>
-          <label class="chk"><input type="checkbox" id="optHr"> Recalculer la fréquence cardiaque</label>
-        </div>
-        <details class="adv">
-          <summary>Modèle physique (puissance)</summary>
-          <div class="field"><label>Masse totale</label><div class="row"><input id="mass" type="number" step="1" value="83" class="num"><span class="u">kg</span></div></div>
-          <div class="field"><label>SCx (CdA)</label><div class="row"><input id="cda" type="number" step="0.01" value="0.32" class="num"><span class="u">m²</span></div></div>
-          <div class="field"><label>Crr</label><div class="row"><input id="crr" type="number" step="0.001" value="0.005" class="num"></div></div>
-          <div class="field"><label>FC maximale</label><div class="row"><input id="hrMax" type="number" step="1" value="190" class="num"><span class="u">bpm</span></div></div>
-        </details>
-      </div>
-
-      <div class="card">
-        <h2>Réglages d’analyse</h2>
-        <div class="field"><label>Lissage vitesse</label><div class="row"><input id="optSpeedSmooth" type="number" min="1" step="1" value="5" class="num"><span class="u">s</span></div></div>
-        <div class="field"><label>Base de calcul de la pente</label><div class="row"><input id="optGradeWin" type="number" min="5" step="5" value="40" class="num"><span class="u">m</span></div></div>
-        <div class="field"><label>Seuil de pause</label><div class="row"><input id="optPause" type="number" min="2" step="1" value="10" class="num"><span class="u">s</span></div></div>
-      </div>
-    </div>
-  </section>
-</main>
-
-<div id="modal" class="modal" hidden>
-  <div class="modal-box">
-    <h2 id="modalTitle">Export</h2>
-    <div id="modalBody"></div>
-    <div class="modal-actions">
-      <button id="modalClose" class="btn ghost">Fermer</button>
-      <a id="download" class="btn accent" download>Télécharger le GPX</a>
-    </div>
-  </div>
+<div class="toolbar">
+  <span class="seg2"><button class="seg on" data-x="time">Temps</button><button class="seg" data-x="dist">Distance</button></span>
+  <button class="tb" id="zoomSel" disabled>⤢ sél.</button>
+  <button class="tb" id="zoomReset">⤢ tout</button>
+  <button class="tb" id="clearSel" disabled>✕ sél.</button>
+  <span class="grow"></span>
+  <span id="gain" class="gain"></span>
 </div>
+
+<section class="mapwrap" id="mapwrap">
+  <canvas id="map"></canvas>
+  <div class="mapctl">
+    <button class="mb" id="mapSelect">Sélection</button>
+    <button class="mb" id="mapFitAll">Tout</button>
+    <button class="mb" id="mapFitView">Vue</button>
+    <button class="mb" id="mapFitSel" disabled>Sél.</button>
+  </div>
+</section>
+<div class="grabber" id="grabber"><span></span></div>
+
+<main class="charts" id="charts"></main>
+<div id="chartFooter" class="chartfoot"></div>
+
+<div class="empty" id="empty">
+  <h1>Retouche de sorties vélo</h1>
+  <p>Toutes les séries du fichier s’affichent, synchronisées avec la carte.
+     Sélectionnez un tronçon, filtrez les points à accélérer, puis exportez un GPX
+     réimportable dans Strava.</p>
+  <p class="dim">Un doigt&nbsp;: sélectionner · deux doigts&nbsp;: zoomer et se déplacer ·
+     double-tap&nbsp;: vue complète.</p>
+  <p class="dim">Tout reste sur votre téléphone&nbsp;; seules les tuiles de la carte sont téléchargées.</p>
+</div>
+
+<nav class="tabs">
+  <button class="tab" data-sheet="channels"><b>Graphes</b><span>séries · axes Y</span></button>
+  <button class="tab" data-sheet="edit" id="tabEdit"><b>Retoucher</b><span id="tabEditSub">sélection</span></button>
+  <button class="tab" data-sheet="opts"><b>Réglages</b><span id="tabOptsSub">0 modif.</span></button>
+  <button class="tab accent" id="tabExport" disabled><b>Exporter</b><span>GPX</span></button>
+</nav>
+
+<div class="scrim" id="scrim" hidden></div>
+<section class="sheet" id="sheet" hidden>
+  <div class="sheethead">
+    <span class="pull"></span>
+    <h2 id="sheetTitle">—</h2>
+    <button class="iconbtn" id="sheetClose" aria-label="Fermer">✕</button>
+  </div>
+  <div class="sheetbody" id="sheetBody"></div>
+</section>
 
 <script>
 /* Minimal, dependency-free XML parser / writer.
@@ -1604,6 +1548,113 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
 
 </script>
 <script>
+/* Helpers shared by the desktop and the mobile interfaces (no DOM here). */
+(function (global) {
+  'use strict';
+
+  function fmtClock(sec) {
+    sec = Math.max(0, Math.round(sec));
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    return h ? h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0')
+      : m + ':' + String(s).padStart(2, '0');
+  }
+
+  function fmtDelta(sec) {
+    var s = Math.round(Math.abs(sec));
+    var m = Math.floor(s / 60);
+    return (sec >= 0 ? '−' : '+') + (m ? m + ' min ' : '') + (s % 60) + ' s';
+  }
+
+  function fmtDist(m) { return m >= 1000 ? (m / 1000).toFixed(2) + ' km' : Math.round(m) + ' m'; }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&quot;';
+    });
+  }
+
+  /** Summary of the track between two sample indices. */
+  function segStats(track, i0, i1) {
+    i0 = Math.max(0, Math.min(track.n - 1, i0));
+    i1 = Math.max(0, Math.min(track.n - 1, i1));
+    if (i1 < i0) { var s = i0; i0 = i1; i1 = s; }
+    var dur = track.t[i1] - track.t[i0], dist = track.dist[i1] - track.dist[i0];
+    var gain = 0, moving = 0, movDist = 0;
+    for (var i = i0; i < i1; i++) {
+      var de = track.eleSmooth[i + 1] - track.eleSmooth[i];
+      if (de > 0) gain += de;
+      if (!track.gap[i] && track.dSeg[i] / Math.max(0.001, track.dtSeg[i]) > 0.8) {
+        moving += track.dtSeg[i]; movDist += track.dSeg[i];
+      }
+    }
+    return {
+      i0: i0, i1: i1, dur: dur, dist: dist, gain: gain,
+      avg: dur > 0 ? dist / dur * 3.6 : 0,
+      avgMoving: moving > 0 ? movDist / moving * 3.6 : 0,
+      grade: dist > 0 ? Math.atan2(track.eleSmooth[i1] - track.eleSmooth[i0], dist) * 180 / Math.PI : 0
+    };
+  }
+
+  function describeFilters(edit) {
+    if (!edit.filters.length) return 'tous les points';
+    return edit.filters.map(function (f) {
+      var s = (f.label || f.key).toLowerCase();
+      if (f.min != null && f.max != null) return s + ' ' + f.min + '–' + f.max + ' ' + (f.unit || '');
+      if (f.min != null) return s + ' > ' + f.min + ' ' + (f.unit || '');
+      return s + ' < ' + f.max + ' ' + (f.unit || '');
+    }).join(', ');
+  }
+
+  /** Modified-speed curve (km/h) over the original samples; NaN where untouched. */
+  function overlaySpeed(track, edits) {
+    var comp = global.Edits.composeFactors(track, edits);
+    var n = track.n, over = new Float64Array(n), any = false;
+    for (var i = 0; i < n; i++) {
+      var f = i === 0 ? comp.factor[0] : i >= n - 1 ? comp.factor[n - 2] : (comp.factor[i - 1] + comp.factor[i]) / 2;
+      if (!isFinite(f)) f = 1;
+      if (Math.abs(f - 1) > 1e-9) { any = true; over[i] = track.vSmooth[i] * 3.6 * f; }
+      else over[i] = NaN;
+    }
+    return { data: any ? over : null, factor: comp.factor, perEdit: comp.perEdit };
+  }
+
+  /** Preview figures for an edit being configured. */
+  function previewEdit(track, edit) {
+    var r = global.Edits.resolveEdit(track, edit);
+    var nInt = 0, sumT = 0, maxNew = 0, sumF = 0, fw = 0;
+    for (var i = r.i0; i < r.i1; i++) {
+      if (Math.abs(r.factors[i] - 1) < 1e-9) continue;
+      nInt++; sumT += track.dtSeg[i];
+      sumF += r.factors[i] * track.dtSeg[i]; fw += track.dtSeg[i];
+      var v = global.Edits.intervalSpeedKmh(track, i) * r.factors[i];
+      if (v > maxNew) maxNew = v;
+    }
+    var st = segStats(track, r.i0, r.i1);
+    return {
+      count: nInt, share: st.dur > 0 ? sumT / st.dur : 0, avgFactor: fw ? sumF / fw : 1,
+      maxKmh: maxNew, saved: r.saved, warn: r.warn, segDur: st.dur
+    };
+  }
+
+  /** Build the output file and its validation report. */
+  function buildExport(track, source, edits, options, fileName) {
+    var comp = global.Edits.composeFactors(track, edits);
+    var res = global.Edits.rebuild(track, comp.factor, options);
+    var text = global.GPX.build(source, res.points);
+    var check = global.GPXValidate.validate(text);
+    var name = (fileName || 'activite.gpx').replace(/\.gpx$/i, '') + '-retouche.gpx';
+    return { res: res, text: text, check: check, name: name };
+  }
+
+  global.UI = {
+    fmtClock: fmtClock, fmtDelta: fmtDelta, fmtDist: fmtDist, escapeHtml: escapeHtml,
+    segStats: segStats, describeFilters: describeFilters, overlaySpeed: overlaySpeed,
+    previewEdit: previewEdit, buildExport: buildExport
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
 /* Synchronised time-series stack drawn on canvases.
  * All rows share the same X window; each row has its own Y scaling (auto on the
  * visible window, or a manual min/max).
@@ -2657,49 +2708,62 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
 
 </script>
 <script>
-/* Starca Tuner — application shell: loading, panels, selection, export. */
+/* Starca Tuner — interface mobile.
+ * Même moteur que la version bureau (gpx / track / edit / validate / charts / map),
+ * disposition et gestes adaptés à un écran de téléphone.
+ */
 (function () {
   'use strict';
 
-  var S = {
-    fileName: null, source: null, track: null, stack: null, map: null,
-    edits: [], selection: null, pending: null, lastResult: null
-  };
-
   var $ = function (id) { return document.getElementById(id); };
-  var fmtClock = window.ChartUtils.fmtClock;
+  var esc = UI.escapeHtml, fmtClock = UI.fmtClock, fmtDelta = UI.fmtDelta, fmtDist = UI.fmtDist;
 
-  function fmtDelta(sec) {
-    var s = Math.round(Math.abs(sec));
-    var m = Math.floor(s / 60);
-    return (sec >= 0 ? '−' : '+') + (m ? m + ' min ' : '') + (s % 60) + ' s';
+  var S = { fileName: null, source: null, track: null, stack: null, map: null, edits: [], selection: null, pending: null };
+  var filterState = {};
+  var P = {                                   // paramètres de la retouche en cours
+    mode: 'target', targetMin: 1, targetSec: 0, factor: 1.1, deltaKmh: 3, speedKmh: 28,
+    maxSpeedKmh: 0, minSpeedKmh: 5, maxFactor: 2.5, rampSec: 15, smoothSec: 10
+  };
+  var O = {                                   // options globales
+    align: true, power: false, hr: false, tile: 'osm',
+    mass: 83, cda: 0.32, crr: 0.005, hrMax: 190,
+    speedSmooth: 5, gradeWindow: 40, pauseGap: 10
+  };
+  var MAP_SIZES = [0, 28, 58];
+  var mapSize = 1;
+
+  /** Adapte la hauteur de carte et la hauteur mini des graphes à l'écran. */
+  function tuneSizes() {
+    var h = window.innerHeight;
+    MAP_SIZES = h < 620 ? [0, 22, 50] : h < 760 ? [0, 28, 58] : [0, 32, 62];
+    if (S.stack) S.stack.minRow = Math.max(40, Math.min(64, Math.round(h / 12)));
   }
-  function fmtDist(m) { return m >= 1000 ? (m / 1000).toFixed(2) + ' km' : Math.round(m) + ' m'; }
 
-  /* ------------------------------------------------------------------ load */
+  /* ------------------------------------------------------------ chargement */
 
   function loadText(text, name) {
     var source, track;
     try {
       source = GPX.parse(text);
-      track = Track.build(source, analysisOpts());
+      track = Track.build(source, { speedSmooth: O.speedSmooth, gradeWindow: O.gradeWindow, pauseGap: O.pauseGap });
     } catch (e) {
       alert('Lecture impossible : ' + e.message);
       return;
     }
-    S.fileName = name; S.source = source; S.track = track; S.edits = []; S.selection = null; S.pending = null;
-
+    S.fileName = name; S.source = source; S.track = track;
+    S.edits = []; S.selection = null; S.pending = null;
     $('empty').hidden = true;
-    $('export').disabled = false;
+    $('tabExport').disabled = false;
 
     if (!S.stack) {
       S.stack = new ChartStack($('charts'), {
-        footer: $('chartFooter'),
+        footer: $('chartFooter'), touch: true, compactHead: true, gutter: 42, minRowHeight: 56,
         onView: function (v) { S.map.setView(v.i0, v.i1); },
-        onSelect: onChartSelect,
+        onSelect: onSelect,
         onHover: function (i) { S.map.setHover(i); }
       });
     }
+    tuneSizes();
     S.stack.setTrack(track);
 
     if (!S.map) {
@@ -2707,94 +2771,44 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
         onSelect: function (a, b) { S.stack.setSelectionIndices(a, b); },
         onHover: function (i) { S.stack.setHoverIndex(i); }
       });
-      var sel = $('tileSource'), srcs = S.map.sources();
-      Object.keys(srcs).forEach(function (k) {
-        var o = document.createElement('option');
-        o.value = k; o.textContent = srcs[k].name;
-        sel.appendChild(o);
-      });
-      sel.value = S.map.source;
-      sel.addEventListener('change', function () { S.map.setSource(sel.value); });
+      S.map.setSource(O.tile);
     }
     S.map.setTrack(track);
     S.map.setView(0, track.n - 1);
 
-    buildChannelChips();
-    buildFilterRows();
-    renderActivity();
-    renderEdits();
+    // Écran étroit : on n'affiche d'emblée que trois séries — le profil
+    // d'altitude reste visible dans la bande du bas, et l'onglet « Graphes »
+    // permet d'afficher tout le reste.
+    var keep = { speed: 1, grade: 1 };
+    var extra = track.channels.filter(function (c) { return /power|watts/i.test(c.extKey || ''); })[0] ||
+      track.channels.filter(function (c) { return /hr|heartrate/i.test(c.extKey || ''); })[0];
+    if (extra) keep[extra.key] = 1; else keep.ele = 1;
+    track.channels.forEach(function (c) {
+      if (c.visible === false) return;
+      S.stack.setRowConfig(c.key, { visible: !!keep[c.key] });
+    });
+
+    renderHeader();
     updateSelectionUI();
     updateOverlay();
   }
 
-  function analysisOpts() {
-    return {
-      speedSmooth: parseFloat($('optSpeedSmooth').value) || 5,
-      gradeWindow: parseFloat($('optGradeWin').value) || 40,
-      pauseGap: parseFloat($('optPause').value) || 10
-    };
+  function renderHeader() {
+    var st = S.track.stats;
+    $('title').textContent = S.source.name;
+    $('sub').textContent = new Date(st.startMs).toLocaleDateString('fr-FR') + ' · ' +
+      fmtDist(st.distance) + ' · ' + fmtClock(st.duration) + ' · D+ ' + Math.round(st.elevGain) + ' m · ' +
+      st.avgMovingKmh.toFixed(1) + ' km/h';
   }
 
-  function renderActivity() {
-    var t = S.track, st = t.stats;
-    var d = new Date(st.startMs);
-    $('activity').innerHTML = '<b>' + escapeHtml(S.source.name) + '</b> — ' + d.toLocaleString('fr-FR') +
-      ' · ' + fmtDist(st.distance) + ' · ' + fmtClock(st.duration) +
-      ' · D+ ' + Math.round(st.elevGain) + ' m · ' + st.avgMovingKmh.toFixed(1) + ' km/h moy' +
-      ' · ' + t.n + ' points';
-  }
+  /* ------------------------------------------------------------- sélection */
 
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"]/g, function (c) {
-      return c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&quot;';
-    });
-  }
-
-  /* -------------------------------------------------------------- channels */
-
-  function buildChannelChips() {
-    var box = $('chanToggles');
-    box.innerHTML = '';
-    S.track.channels.forEach(function (ch) {
-      if (ch.visible === false && S.stack) S.stack.setRowVisible(ch.key, false);
-      var b = document.createElement('button');
-      b.className = 'chip' + (ch.visible === false ? '' : ' on');
-      b.innerHTML = '<span class="cdot" style="background:' + ch.color + '"></span>' + escapeHtml(ch.label);
-      b.addEventListener('click', function () {
-        var on = !b.classList.contains('on');
-        b.classList.toggle('on', on);
-        S.stack.setRowVisible(ch.key, on);
-      });
-      box.appendChild(b);
-    });
-  }
-
-  /* ------------------------------------------------------------- selection */
-
-  function onChartSelect(sel) {
+  function onSelect(sel) {
     S.selection = sel;
     if (sel) S.map.setSelection(sel.i0, sel.i1); else S.map.setSelection(null);
     updateSelectionUI();
-    updatePreview();
-  }
-
-  function segStats(i0, i1) {
-    var t = S.track;
-    i0 = Math.max(0, Math.min(t.n - 1, i0)); i1 = Math.max(0, Math.min(t.n - 1, i1));
-    if (i1 < i0) { var s = i0; i0 = i1; i1 = s; }
-    var dur = t.t[i1] - t.t[i0], dist = t.dist[i1] - t.dist[i0];
-    var gain = 0, moving = 0, movDist = 0;
-    for (var i = i0; i < i1; i++) {
-      var de = t.eleSmooth[i + 1] - t.eleSmooth[i];
-      if (de > 0) gain += de;
-      if (!t.gap[i] && t.dSeg[i] / Math.max(0.001, t.dtSeg[i]) > 0.8) { moving += t.dtSeg[i]; movDist += t.dSeg[i]; }
-    }
-    return {
-      i0: i0, i1: i1, dur: dur, dist: dist, gain: gain,
-      avg: dur > 0 ? dist / dur * 3.6 : 0,
-      avgMoving: moving > 0 ? movDist / moving * 3.6 : 0,
-      grade: dist > 0 ? Math.atan2(t.eleSmooth[i1] - t.eleSmooth[i0], dist) * 180 / Math.PI : 0
-    };
+    if ($('sheet').dataset.kind === 'edit') renderSheet('edit');
+    else updateOverlay();
   }
 
   function updateSelectionUI() {
@@ -2802,91 +2816,118 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
     $('zoomSel').disabled = !has;
     $('clearSel').disabled = !has;
     $('mapFitSel').disabled = !has;
-    $('editCard').hidden = !has;
-    if (!has) {
-      $('selInfo').className = 'kv dim';
-      $('selInfo').textContent = 'Aucune sélection. Glissez dans un graphe, ou activez « Sélection sur la carte ».';
-      return;
-    }
-    var st = segStats(S.selection.i0, S.selection.i1);
-    var t = S.track;
-    $('selInfo').className = 'kv';
-    $('selInfo').innerHTML =
-      row('Départ', fmtClock(t.t[st.i0]) + '  ·  ' + fmtDist(t.dist[st.i0])) +
-      row('Arrivée', fmtClock(t.t[st.i1]) + '  ·  ' + fmtDist(t.dist[st.i1])) +
-      row('Durée', fmtClock(st.dur)) +
-      row('Distance', fmtDist(st.dist)) +
-      row('Vitesse moy.', st.avg.toFixed(1) + ' km/h' + (st.avgMoving - st.avg > 0.3 ? ' (' + st.avgMoving.toFixed(1) + ' en mouvement)' : '')) +
-      row('Dénivelé +', Math.round(st.gain) + ' m') +
-      row('Pente moy.', st.grade.toFixed(2) + ' °') +
-      row('Points', (st.i1 - st.i0 + 1) + '');
-    buildFilterRows();
+    if (!has) { $('tabEditSub').textContent = 'aucune sélection'; return; }
+    var st = UI.segStats(S.track, S.selection.i0, S.selection.i1);
+    $('tabEditSub').textContent = fmtDist(st.dist) + ' · ' + fmtClock(st.dur);
   }
 
-  function row(k, v) { return '<span>' + k + '</span><b>' + escapeHtml(v) + '</b>'; }
+  function updateOverlay() {
+    if (!S.track || !S.stack) return;
+    var list = S.edits.slice();
+    if (S.pending) list.push(S.pending);
+    var ov = UI.overlaySpeed(S.track, list);
+    S.stack.setOverlay('speed', ov.data);
 
-  /* ---------------------------------------------------------------- filters */
+    var applied = Edits.composeFactors(S.track, S.edits);
+    var saved = Edits.savedTime(S.track, applied.factor, 0, applied.factor.length);
+    $('gain').textContent = saved ? fmtDelta(saved) : '';
+    $('tabOptsSub').textContent = S.edits.length + ' modif.';
+    var expSub = $('tabExport').querySelector('span');
+    if (expSub) expSub.textContent = saved ? '→ ' + fmtClock(S.track.stats.duration - saved) : 'GPX';
+  }
+
+  /* --------------------------------------------------------------- feuille */
+
+  function openSheet(kind) {
+    $('sheet').dataset.kind = kind;
+    renderSheet(kind);
+    $('sheet').hidden = false;
+    $('scrim').hidden = false;
+  }
+  function closeSheet() {
+    $('sheet').hidden = true;
+    $('scrim').hidden = true;
+    $('sheet').dataset.kind = '';
+    if (S.pending) { S.pending = null; updateOverlay(); }
+  }
+
+  function renderSheet(kind) {
+    var body = $('sheetBody');
+    if (kind === 'channels') { $('sheetTitle').textContent = 'Graphes affichés'; body.innerHTML = ''; body.appendChild(channelsPanel()); }
+    else if (kind === 'edit') { $('sheetTitle').textContent = 'Retoucher le tronçon'; body.innerHTML = ''; body.appendChild(editPanel()); }
+    else if (kind === 'opts') { $('sheetTitle').textContent = 'Modifications et réglages'; body.innerHTML = ''; body.appendChild(optsPanel()); }
+    else if (kind === 'export') { $('sheetTitle').textContent = 'Exporter'; body.innerHTML = ''; body.appendChild(exportPanel()); }
+    else if (kind === 'help') { $('sheetTitle').textContent = 'Mode d’emploi'; body.innerHTML = helpHtml(); }
+    body.scrollTop = 0;
+  }
+
+  function el(tag, cls, html) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (html != null) e.innerHTML = html;
+    return e;
+  }
+
+  /* ------------------------------------------------- feuille « Graphes »  */
+
+  function channelsPanel() {
+    var box = el('div');
+    if (!S.track) { box.appendChild(el('p', 'dim', 'Ouvrez d’abord un fichier.')); return box; }
+    box.appendChild(el('p', 'dim', 'Cochez les séries à afficher. Décochez « auto » pour figer l’axe Y entre deux valeurs.'));
+    S.stack.getRows().forEach(function (r) {
+      var row = el('div', 'crow');
+      row.innerHTML =
+        '<input type="checkbox" ' + (r.visible ? 'checked' : '') + '>' +
+        '<span class="cname"><span class="cdot" style="background:' + r.color + '"></span>' +
+        esc(r.label) + (r.unit ? ' <span class="u">' + esc(r.unit) + '</span>' : '') + '</span>' +
+        '<label class="u"><input type="checkbox" class="auto" ' + (r.yMode === 'auto' ? 'checked' : '') + '> auto</label>' +
+        '<input type="number" class="mn" inputmode="decimal" placeholder="min" ' + (r.yMode === 'auto' ? 'disabled' : '') + ' value="' + (r.yMin == null ? '' : r.yMin) + '">' +
+        '<input type="number" class="mx" inputmode="decimal" placeholder="max" ' + (r.yMode === 'auto' ? 'disabled' : '') + ' value="' + (r.yMax == null ? '' : r.yMax) + '">';
+      var vis = row.querySelector('input[type=checkbox]');
+      var auto = row.querySelector('.auto');
+      var mn = row.querySelector('.mn'), mx = row.querySelector('.mx');
+      vis.addEventListener('change', function () { S.stack.setRowConfig(r.key, { visible: vis.checked }); });
+      auto.addEventListener('change', function () {
+        mn.disabled = mx.disabled = auto.checked;
+        if (!auto.checked) {
+          var rng = S.stack.autoRange(r.key);
+          if (mn.value === '') mn.value = rng[0].toFixed(r.decimals);
+          if (mx.value === '') mx.value = rng[1].toFixed(r.decimals);
+        }
+        S.stack.setRowConfig(r.key, {
+          yMode: auto.checked ? 'auto' : 'fixed',
+          yMin: mn.value === '' ? null : parseFloat(mn.value),
+          yMax: mx.value === '' ? null : parseFloat(mx.value)
+        });
+      });
+      function onY() {
+        S.stack.setRowConfig(r.key, {
+          yMode: 'fixed',
+          yMin: mn.value === '' ? null : parseFloat(mn.value),
+          yMax: mx.value === '' ? null : parseFloat(mx.value)
+        });
+      }
+      mn.addEventListener('input', onY);
+      mx.addEventListener('input', onY);
+      box.appendChild(row);
+    });
+    return box;
+  }
+
+  /* ------------------------------------------------ feuille « Retoucher » */
 
   function filterableChannels() {
-    return S.track.channels.filter(function (c) { return c.filterable !== false && c.key !== 'ele'; })
-      .concat(S.track.channels.filter(function (c) { return c.key === 'ele'; }));
+    return S.track.channels.filter(function (c) { return c.filterable !== false; });
   }
-
-  var filterState = {};   // key -> {on, min, max}
-
-  function buildFilterRows() {
-    var box = $('filters');
-    if (!box || !S.track) return;
-    var sel = S.selection;
-    box.innerHTML = '';
-    filterableChannels().forEach(function (ch) {
-      var st = filterState[ch.key] || (filterState[ch.key] = { on: false, min: '', max: '' });
-      var rmin = Infinity, rmax = -Infinity;
-      if (sel) {
-        for (var i = sel.i0; i <= sel.i1; i++) {
-          var v = ch.data[i];
-          if (!isFinite(v)) continue;
-          if (v < rmin) rmin = v; if (v > rmax) rmax = v;
-        }
-      }
-      var rangeTxt = isFinite(rmin) ? rmin.toFixed(ch.decimals) + ' … ' + rmax.toFixed(ch.decimals) : '';
-      var el = document.createElement('div');
-      el.className = 'frow';
-      el.innerHTML =
-        '<label><input type="checkbox" ' + (st.on ? 'checked' : '') + '>' +
-        '<span class="fdot" style="background:' + ch.color + '"></span>' + escapeHtml(ch.label) +
-        (ch.unit ? ' <span class="u">' + ch.unit + '</span>' : '') + '</label>' +
-        '<span class="rng">' + rangeTxt + '</span>' +
-        '<input type="number" step="any" placeholder="min" value="' + st.min + '" ' + (st.on ? '' : 'disabled') + '>' +
-        '<input type="number" step="any" placeholder="max" value="' + st.max + '" ' + (st.on ? '' : 'disabled') + '>';
-      var cb = el.querySelector('input[type=checkbox]');
-      var mins = el.querySelectorAll('input[type=number]');
-      cb.addEventListener('change', function () {
-        st.on = cb.checked;
-        mins[0].disabled = mins[1].disabled = !st.on;
-        updatePreview();
-      });
-      mins[0].addEventListener('input', function () { st.min = mins[0].value; updatePreview(); });
-      mins[1].addEventListener('input', function () { st.max = mins[1].value; updatePreview(); });
-      box.appendChild(el);
-    });
-  }
-
-  /* ------------------------------------------------------------------ edit */
 
   function readEdit() {
     if (!S.selection) return null;
     var e = Edits.defaultEdit(S.track, S.selection.i0, S.selection.i1);
-    e.mode = $('mode').value;
-    e.targetSec = (parseFloat($('targetMin').value) || 0) * 60 + (parseFloat($('targetSec').value) || 0);
-    e.factor = parseFloat($('factor').value) || 1;
-    e.deltaKmh = parseFloat($('delta2').value) || 0;
-    e.speedKmh = parseFloat($('speedTarget').value) || 0;
-    e.maxSpeedKmh = parseFloat($('maxSpeed').value) || 0;
-    e.minSpeedKmh = parseFloat($('minSpeed').value) || 0;
-    e.maxFactor = parseFloat($('maxFactor').value) || 2.5;
-    e.rampSec = parseFloat($('ramp').value) || 0;
-    e.smoothSec = parseFloat($('smooth').value) || 0;
+    e.mode = P.mode;
+    e.targetSec = P.targetMin * 60 + P.targetSec;
+    e.factor = P.factor; e.deltaKmh = P.deltaKmh; e.speedKmh = P.speedKmh;
+    e.maxSpeedKmh = P.maxSpeedKmh; e.minSpeedKmh = P.minSpeedKmh; e.maxFactor = P.maxFactor;
+    e.rampSec = P.rampSec; e.smoothSec = P.smoothSec;
     e.filters = [];
     filterableChannels().forEach(function (ch) {
       var st = filterState[ch.key];
@@ -2899,193 +2940,344 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
     return e;
   }
 
-  function describeFilters(e) {
-    if (!e.filters.length) return 'tous les points';
-    return e.filters.map(function (f) {
-      var s = f.label.toLowerCase();
-      if (f.min != null && f.max != null) return s + ' ' + f.min + '–' + f.max + ' ' + (f.unit || '');
-      if (f.min != null) return s + ' > ' + f.min + ' ' + (f.unit || '');
-      return s + ' < ' + f.max + ' ' + (f.unit || '');
-    }).join(', ');
-  }
-
-  function updatePreview() {
-    var box = $('preview');
-    S.pending = readEdit();
-    if (!S.pending) { updateOverlay(); return; }
-    var r = Edits.resolveEdit(S.track, S.pending);
-    var t = S.track;
-    var nInt = 0, sumT = 0, maxNew = 0, sumF = 0, fw = 0;
-    for (var i = r.i0; i < r.i1; i++) {
-      if (Math.abs(r.factors[i] - 1) < 1e-9) continue;
-      nInt++; sumT += t.dtSeg[i];
-      sumF += r.factors[i] * t.dtSeg[i]; fw += t.dtSeg[i];
-      var v = Edits.intervalSpeedKmh(t, i) * r.factors[i];
-      if (v > maxNew) maxNew = v;
+  function editPanel() {
+    var box = el('div');
+    if (!S.track) { box.appendChild(el('p', 'dim', 'Ouvrez d’abord un fichier.')); return box; }
+    if (!S.selection) {
+      box.appendChild(el('p', 'dim',
+        'Aucun tronçon sélectionné. Glissez un doigt sur un graphe, ou activez « Sélection » sur la carte et suivez le tracé.'));
+      var all = el('button', 'btn wide', 'Sélectionner tout le parcours');
+      all.addEventListener('click', function () { S.stack.setSelectionIndices(0, S.track.n - 1); renderSheet('edit'); });
+      box.appendChild(all);
+      return box;
     }
-    var st = segStats(r.i0, r.i1);
-    var html = '';
-    if (!nInt) {
-      html = '<span class="warn">Aucun point ne correspond aux filtres sur ce tronçon.</span>';
+
+    var st = UI.segStats(S.track, S.selection.i0, S.selection.i1);
+    var t = S.track;
+    box.appendChild(el('div', 'kv',
+      '<span>Départ</span><b>' + fmtClock(t.t[st.i0]) + ' · ' + fmtDist(t.dist[st.i0]) + '</b>' +
+      '<span>Arrivée</span><b>' + fmtClock(t.t[st.i1]) + ' · ' + fmtDist(t.dist[st.i1]) + '</b>' +
+      '<span>Durée</span><b>' + fmtClock(st.dur) + '</b>' +
+      '<span>Distance</span><b>' + fmtDist(st.dist) + '</b>' +
+      '<span>Vitesse moy.</span><b>' + st.avg.toFixed(1) + ' km/h</b>' +
+      '<span>Dénivelé +</span><b>' + Math.round(st.gain) + ' m</b>' +
+      '<span>Pente moy.</span><b>' + st.grade.toFixed(2) + ' °</b>'));
+
+    box.appendChild(el('h3', null, 'Consigne'));
+    var modeSel = el('select', 'sel',
+      '<option value="target">Gagner un temps donné</option>' +
+      '<option value="factor">Multiplier la vitesse</option>' +
+      '<option value="delta">Ajouter des km/h</option>' +
+      '<option value="speed">Viser une vitesse minimale</option>');
+    modeSel.value = P.mode;
+    modeSel.addEventListener('change', function () { P.mode = modeSel.value; renderSheet('edit'); });
+    box.appendChild(modeSel);
+
+    if (P.mode === 'target') {
+      box.appendChild(numField('Temps à gagner', P.targetMin, 'min', function (v) { P.targetMin = v; }, 0, 1,
+        P.targetSec, 's', function (v) { P.targetSec = v; }));
+    } else if (P.mode === 'factor') {
+      box.appendChild(numField('Facteur de vitesse', P.factor, '×', function (v) { P.factor = v; }, 0.3, 0.01));
+    } else if (P.mode === 'delta') {
+      box.appendChild(numField('Supplément', P.deltaKmh, 'km/h', function (v) { P.deltaKmh = v; }, -30, 0.5));
     } else {
-      html = 'Points retouchés : <b>' + nInt + '</b> (' + Math.round(sumT / Math.max(1, st.dur) * 100) + ' % de la durée du tronçon)<br>' +
-        'Facteur moyen : <b>×' + (fw ? sumF / fw : 1).toFixed(3) + '</b> · vitesse max atteinte <b>' + maxNew.toFixed(1) + ' km/h</b><br>' +
-        'Gain sur le tronçon : <b>' + fmtDelta(r.saved) + '</b> (' + fmtClock(st.dur) + ' → ' + fmtClock(st.dur - r.saved) + ')';
-      if (r.warn) html += '<br><span class="warn">' + escapeHtml(r.warn) + '</span>';
+      box.appendChild(numField('Vitesse visée', P.speedKmh, 'km/h', function (v) { P.speedKmh = v; }, 0, 0.5));
     }
-    box.innerHTML = html;
-    updateOverlay();
-  }
 
-  /** Modified-speed curve = applied edits (+ the one being configured). */
-  function updateOverlay() {
-    if (!S.track || !S.stack) return;
-    var list = S.edits.slice();
-    if (S.pending) list.push(S.pending);
-    var comp = Edits.composeFactors(S.track, list);
-    var t = S.track, n = t.n;
-    var any = false;
-    var over = new Float64Array(n);
-    for (var i = 0; i < n; i++) {
-      var f = i === 0 ? comp.factor[0] : i >= n - 1 ? comp.factor[n - 2] : (comp.factor[i - 1] + comp.factor[i]) / 2;
-      if (!isFinite(f)) f = 1;
-      if (Math.abs(f - 1) > 1e-9) { any = true; over[i] = t.vSmooth[i] * 3.6 * f; }
-      else over[i] = NaN;
-    }
-    S.stack.setOverlay('speed', any ? over : null);
-
-    var applied = Edits.composeFactors(S.track, S.edits);
-    var saved = Edits.savedTime(S.track, applied.factor, 0, applied.factor.length);
-    $('delta').textContent = saved ? 'Gain cumulé : ' + fmtDelta(saved) + '  ·  ' +
-      fmtClock(t.stats.duration) + ' → ' + fmtClock(t.stats.duration - saved) : '';
-  }
-
-  function applyEdit() {
-    var e = readEdit();
-    if (!e) return;
-    var r = Edits.resolveEdit(S.track, e);
-    if (!r.count) { alert('Aucun point ne correspond aux filtres : rien à appliquer.'); return; }
-    e.label = describeFilters(e);
-    S.edits.push(e);
-    S.pending = null;
-    S.stack.setSelection(null);
-    renderEdits();
-    updateOverlay();
-  }
-
-  function renderEdits() {
-    var box = $('editList');
-    $('editCount').textContent = S.edits.length;
-    if (!S.edits.length) {
-      box.className = 'editlist dim';
-      box.textContent = 'Aucune modification appliquée.';
-      updateOverlay();
-      return;
-    }
-    box.className = 'editlist';
-    box.innerHTML = '';
-    var comp = Edits.composeFactors(S.track, S.edits);
-    S.edits.forEach(function (e, idx) {
-      var info = comp.perEdit[idx];
-      var t = S.track;
-      var el = document.createElement('div');
-      el.className = 'erow' + (e.enabled ? '' : ' off');
-      el.innerHTML =
-        '<div class="etxt"><div>' + (idx + 1) + '. ' + fmtDist(t.dist[e.i0]) + ' → ' + fmtDist(t.dist[e.i1]) +
-        '  <b>' + (e.enabled ? fmtDelta(info.saved || 0) : '—') + '</b></div>' +
-        '<div class="esub">' + escapeHtml(e.label || describeFilters(e)) + '</div></div>' +
-        '<button title="Voir sur la carte et les graphes">◎</button>' +
-        '<button title="Activer / désactiver">' + (e.enabled ? '👁' : '🚫') + '</button>' +
-        '<button title="Supprimer">🗑</button>';
-      var btns = el.querySelectorAll('button');
-      btns[0].addEventListener('click', function () {
-        S.stack.setSelectionIndices(e.i0, e.i1);
-        S.stack.zoomToSelection();
-        S.map.fitBounds(S.map.boundsOf(e.i0, e.i1));
-      });
-      btns[1].addEventListener('click', function () { e.enabled = !e.enabled; renderEdits(); updateOverlay(); });
-      btns[2].addEventListener('click', function () { S.edits.splice(idx, 1); renderEdits(); updateOverlay(); });
-      box.appendChild(el);
-    });
-    updateOverlay();
-  }
-
-  /* ---------------------------------------------------------------- export */
-
-  function buildOptions() {
-    return {
-      align: $('optAlign').checked,
-      adjust: {
-        power: $('optPower').checked, hr: $('optHr').checked,
-        mass: parseFloat($('mass').value) || 83,
-        cda: parseFloat($('cda').value) || 0.32,
-        crr: parseFloat($('crr').value) || 0.005,
-        hrMax: parseFloat($('hrMax').value) || 190
+    box.appendChild(el('h3', null, 'Filtres — quels points accélérer ?'));
+    filterableChannels().forEach(function (ch) {
+      var fs = filterState[ch.key] || (filterState[ch.key] = { on: false, min: '', max: '' });
+      var rmin = Infinity, rmax = -Infinity;
+      for (var i = S.selection.i0; i <= S.selection.i1; i++) {
+        var v = ch.data[i];
+        if (!isFinite(v)) continue;
+        if (v < rmin) rmin = v;
+        if (v > rmax) rmax = v;
       }
-    };
+      var row = el('div', 'frow',
+        '<input type="checkbox" ' + (fs.on ? 'checked' : '') + '>' +
+        '<span class="fname"><span class="fdot" style="background:' + ch.color + '"></span>' +
+        '<span class="fnamet">' + esc(ch.label) + (ch.unit ? ' <span class="u">' + esc(ch.unit) + '</span>' : '') +
+        '<br><span class="frange">' + (isFinite(rmin) ? rmin.toFixed(ch.decimals) + ' … ' + rmax.toFixed(ch.decimals) : '—') + '</span></span></span>' +
+        '<input type="number" inputmode="decimal" placeholder="min" value="' + fs.min + '" ' + (fs.on ? '' : 'disabled') + '>' +
+        '<input type="number" inputmode="decimal" placeholder="max" value="' + fs.max + '" ' + (fs.on ? '' : 'disabled') + '>');
+      var cb = row.querySelector('input[type=checkbox]');
+      var nums = row.querySelectorAll('input[type=number]');
+      cb.addEventListener('change', function () {
+        fs.on = cb.checked;
+        nums[0].disabled = nums[1].disabled = !fs.on;
+        refreshPreview();
+      });
+      nums[0].addEventListener('input', function () { fs.min = nums[0].value; refreshPreview(); });
+      nums[1].addEventListener('input', function () { fs.max = nums[1].value; refreshPreview(); });
+      box.appendChild(row);
+    });
+
+    var adv = el('details', null, '<summary class="dim">Réglages fins</summary>');
+    adv.appendChild(numField('Vitesse à ne pas dépasser', P.maxSpeedKmh, 'km/h', function (v) { P.maxSpeedKmh = v; }, 0, 1));
+    adv.appendChild(numField('Ne rien toucher sous', P.minSpeedKmh, 'km/h', function (v) { P.minSpeedKmh = v; }, 0, 1));
+    adv.appendChild(numField('Facteur maximal', P.maxFactor, '×', function (v) { P.maxFactor = v; }, 1, 0.1));
+    adv.appendChild(numField('Transition aux bords', P.rampSec, 's', function (v) { P.rampSec = v; }, 0, 1));
+    adv.appendChild(numField('Lissage du facteur', P.smoothSec, 's', function (v) { P.smoothSec = v; }, 0, 1));
+    box.appendChild(adv);
+
+    var prev = el('div', 'preview');
+    prev.id = 'previewBox';
+    box.appendChild(prev);
+
+    var apply = el('button', 'btn accent', 'Appliquer au tronçon');
+    apply.addEventListener('click', function () {
+      var e = readEdit();
+      var r = Edits.resolveEdit(S.track, e);
+      if (!r.count) { alert('Aucun point ne correspond aux filtres : rien à appliquer.'); return; }
+      e.label = UI.describeFilters(e);
+      S.edits.push(e);
+      S.pending = null;
+      S.stack.setSelection(null);
+      updateOverlay();
+      closeSheet();
+    });
+    box.appendChild(apply);
+
+    setTimeout(refreshPreview, 0);
+    return box;
   }
 
-  function doExport() {
-    var comp = Edits.composeFactors(S.track, S.edits);
-    var res = Edits.rebuild(S.track, comp.factor, buildOptions());
-    var text = GPX.build(S.source, res.points);
-    var check = GPXValidate.validate(text);
-    S.lastResult = res;
+  function numField(label, value, unit, onChange, min, step, value2, unit2, onChange2) {
+    var f = el('div', 'field');
+    f.appendChild(el('label', null, label));
+    var val = el('div', 'val');
+    var inp = document.createElement('input');
+    inp.type = 'number'; inp.className = 'num'; inp.inputMode = 'decimal';
+    inp.value = value; if (min != null) inp.min = min; if (step) inp.step = step;
+    inp.addEventListener('input', function () { onChange(parseFloat(inp.value) || 0); refreshPreview(); });
+    val.appendChild(inp);
+    val.appendChild(el('span', 'u', unit));
+    if (value2 != null) {
+      var inp2 = document.createElement('input');
+      inp2.type = 'number'; inp2.className = 'num'; inp2.inputMode = 'decimal';
+      inp2.value = value2; inp2.min = 0; inp2.step = 1;
+      inp2.addEventListener('input', function () { onChange2(parseFloat(inp2.value) || 0); refreshPreview(); });
+      val.appendChild(inp2);
+      val.appendChild(el('span', 'u', unit2));
+    }
+    f.appendChild(val);
+    return f;
+  }
 
-    var t = S.track;
-    var name = (S.fileName || 'activite.gpx').replace(/\.gpx$/i, '') + '-retouche.gpx';
-    var html = '<table>' +
-      tr('Durée', fmtClock(res.stats.oldDuration) + '  →  <b>' + fmtClock(res.stats.newDuration) + '</b>') +
-      tr('Gain', '<b>' + fmtDelta(res.stats.savedSec) + '</b>') +
-      tr('Distance', fmtDist(check.info.distanceM) + ' (origine ' + fmtDist(t.stats.distance) + ')') +
+  function refreshPreview() {
+    var box = $('previewBox');
+    if (!box || !S.selection) return;
+    S.pending = readEdit();
+    var p = UI.previewEdit(S.track, S.pending);
+    if (!p.count) {
+      box.innerHTML = '<span class="warn">Aucun point ne correspond aux filtres sur ce tronçon.</span>';
+    } else {
+      box.innerHTML =
+        'Points retouchés : <b>' + p.count + '</b> (' + Math.round(p.share * 100) + ' % de la durée)<br>' +
+        'Facteur moyen <b>×' + p.avgFactor.toFixed(3) + '</b> · pointe à <b>' + p.maxKmh.toFixed(1) + ' km/h</b><br>' +
+        'Gain : <b>' + fmtDelta(p.saved) + '</b> (' + fmtClock(p.segDur) + ' → ' + fmtClock(p.segDur - p.saved) + ')' +
+        (p.warn ? '<br><span class="warn">' + esc(p.warn) + '</span>' : '');
+    }
+    updateOverlay();
+  }
+
+  /* ------------------------------------------------- feuille « Réglages » */
+
+  function optsPanel() {
+    var box = el('div');
+    box.appendChild(el('h3', null, 'Modifications appliquées'));
+    if (!S.edits.length) box.appendChild(el('p', 'dim', 'Aucune modification pour l’instant.'));
+    else {
+      var comp = Edits.composeFactors(S.track, S.edits);
+      S.edits.forEach(function (e, idx) {
+        var info = comp.perEdit[idx];
+        var row = el('div', 'erow' + (e.enabled ? '' : ' off'),
+          '<div class="etxt"><div>' + (idx + 1) + '. ' + fmtDist(S.track.dist[e.i0]) + ' → ' + fmtDist(S.track.dist[e.i1]) +
+          ' <b>' + (e.enabled ? fmtDelta(info.saved || 0) : '—') + '</b></div>' +
+          '<div class="esub">' + esc(e.label || UI.describeFilters(e)) + '</div></div>' +
+          '<button title="Voir">◎</button><button title="Activer">' + (e.enabled ? '👁' : '🚫') + '</button><button title="Supprimer">🗑</button>');
+        var b = row.querySelectorAll('button');
+        b[0].addEventListener('click', function () {
+          S.stack.setSelectionIndices(e.i0, e.i1);
+          S.stack.zoomToSelection();
+          S.map.fitBounds(S.map.boundsOf(e.i0, e.i1));
+          closeSheet();
+        });
+        b[1].addEventListener('click', function () { e.enabled = !e.enabled; updateOverlay(); renderSheet('opts'); });
+        b[2].addEventListener('click', function () { S.edits.splice(idx, 1); updateOverlay(); renderSheet('opts'); });
+        box.appendChild(row);
+      });
+    }
+
+    box.appendChild(el('h3', null, 'Export'));
+    box.appendChild(check('Caler le gain sur la seconde entière', O.align, function (v) { O.align = v; }));
+    box.appendChild(check('Recalculer la puissance', O.power, function (v) { O.power = v; }));
+    box.appendChild(check('Recalculer la fréquence cardiaque', O.hr, function (v) { O.hr = v; }));
+
+    var phys = el('details', null, '<summary class="dim">Modèle physique</summary>');
+    phys.appendChild(numField('Masse totale', O.mass, 'kg', function (v) { O.mass = v; }, 20, 1));
+    phys.appendChild(numField('SCx (CdA)', O.cda, 'm²', function (v) { O.cda = v; }, 0.1, 0.01));
+    phys.appendChild(numField('Crr', O.crr, '', function (v) { O.crr = v; }, 0.001, 0.001));
+    phys.appendChild(numField('FC maximale', O.hrMax, 'bpm', function (v) { O.hrMax = v; }, 100, 1));
+    box.appendChild(phys);
+
+    box.appendChild(el('h3', null, 'Carte'));
+    var f = el('div', 'field');
+    f.appendChild(el('label', null, 'Fond de carte'));
+    var tsel = el('select', 'sel');
+    var srcs = S.map ? S.map.sources() : {};
+    Object.keys(srcs).forEach(function (k) {
+      var o = document.createElement('option');
+      o.value = k; o.textContent = srcs[k].name;
+      if (k === O.tile) o.selected = true;
+      tsel.appendChild(o);
+    });
+    tsel.addEventListener('change', function () { O.tile = tsel.value; if (S.map) S.map.setSource(O.tile); });
+    f.appendChild(tsel);
+    box.appendChild(f);
+
+    box.appendChild(el('h3', null, 'Analyse'));
+    box.appendChild(numField('Lissage vitesse', O.speedSmooth, 's', function (v) { O.speedSmooth = v; rebuildTrack(); }, 1, 1));
+    box.appendChild(numField('Base de calcul de la pente', O.gradeWindow, 'm', function (v) { O.gradeWindow = v; rebuildTrack(); }, 5, 5));
+    box.appendChild(numField('Seuil de pause', O.pauseGap, 's', function (v) { O.pauseGap = v; rebuildTrack(); }, 2, 1));
+    return box;
+  }
+
+  function check(label, value, onChange) {
+    var l = el('label', 'chk');
+    var i = document.createElement('input');
+    i.type = 'checkbox'; i.checked = value;
+    i.addEventListener('change', function () { onChange(i.checked); updateOverlay(); });
+    l.appendChild(i);
+    l.appendChild(document.createTextNode(label));
+    return l;
+  }
+
+  var rebuildTimer = null;
+  function rebuildTrack() {
+    if (!S.source) return;
+    clearTimeout(rebuildTimer);
+    rebuildTimer = setTimeout(function () {
+      var sel = S.selection, view = S.stack.viewIndices(), xmode = S.stack.xMode, edits = S.edits;
+      var rows = S.stack.getRows();
+      S.track = Track.build(S.source, { speedSmooth: O.speedSmooth, gradeWindow: O.gradeWindow, pauseGap: O.pauseGap });
+      S.stack.setTrack(S.track);
+      S.stack.xMode = xmode;
+      S.map.setTrack(S.track);
+      S.edits = edits;
+      rows.forEach(function (r) { S.stack.setRowConfig(r.key, { visible: r.visible, yMode: r.yMode, yMin: r.yMin, yMax: r.yMax }); });
+      S.stack.setView([S.stack.xArray()[view.i0], S.stack.xArray()[view.i1]]);
+      if (sel) S.stack.setSelectionIndices(sel.i0, sel.i1);
+      updateOverlay();
+    }, 250);
+  }
+
+  /* -------------------------------------------------- feuille « Exporter » */
+
+  function exportPanel() {
+    var box = el('div');
+    var out = UI.buildExport(S.track, S.source, S.edits, {
+      align: O.align,
+      adjust: { power: O.power, hr: O.hr, mass: O.mass, cda: O.cda, crr: O.crr, hrMax: O.hrMax }
+    }, S.fileName);
+    var t = S.track, c = out.check, r = out.res;
+
+    box.appendChild(el('div', null, '<b>' + esc(out.name) + '</b>'));
+    box.appendChild(el('table', 'rep',
+      tr('Durée', fmtClock(r.stats.oldDuration) + ' → <b>' + fmtClock(r.stats.newDuration) + '</b>') +
+      tr('Gain', '<b>' + fmtDelta(r.stats.savedSec) + '</b>') +
+      tr('Distance', fmtDist(c.info.distanceM)) +
       tr('Vitesse moyenne', (t.stats.distance / t.stats.duration * 3.6).toFixed(2) + ' → <b>' +
-        (t.stats.distance / res.stats.newDuration * 3.6).toFixed(2) + ' km/h</b>') +
-      tr('Points', t.n + ' → ' + res.stats.pointsOut + ' (' + res.stats.interpolated + ' recalculés)') +
-      tr('Début', new Date(check.info.start).toLocaleString('fr-FR')) +
-      tr('Fin', new Date(check.info.end).toLocaleString('fr-FR')) +
-      tr('Vitesse instantanée max.', check.info.maxSpeedKmh.toFixed(1) + ' km/h') +
-      '</table>';
+        (t.stats.distance / r.stats.newDuration * 3.6).toFixed(2) + ' km/h</b>') +
+      tr('Points', t.n + ' → ' + r.stats.pointsOut) +
+      tr('Début', new Date(c.info.start).toLocaleString('fr-FR')) +
+      tr('Fin', new Date(c.info.end).toLocaleString('fr-FR'))));
 
-    html += check.ok
-      ? '<p class="ok">✓ Fichier conforme au schéma GPX 1.1 (structure, horodatages ISO-8601 strictement croissants, coordonnées valides) — prêt pour l’import Strava.</p>'
-      : '<p class="err">✗ Problèmes détectés :</p><ul class="err"><li>' + check.errors.map(escapeHtml).join('</li><li>') + '</li></ul>';
-    if (check.warnings.length) html += '<ul class="warn"><li>' + check.warnings.map(escapeHtml).join('</li><li>') + '</li></ul>';
-    if (!S.edits.length) html += '<p class="warn">Aucune modification n’est appliquée : le fichier exporté est identique à l’original.</p>';
-    html += '<p class="dim">Import Strava : « Ajouter → Fichier », ou glissez le fichier sur strava.com/upload. ' +
-      'Les horodatages avant la première retouche sont inchangés ; la suite est décalée du gain de temps.</p>';
+    box.appendChild(el('p', c.ok ? 'ok' : 'err', c.ok
+      ? '✓ Conforme au schéma GPX 1.1 — prêt pour l’import Strava.'
+      : '✗ Problèmes : <ul class="msgs"><li>' + c.errors.map(esc).join('</li><li>') + '</li></ul>'));
+    if (c.warnings.length) box.appendChild(el('p', 'warn', c.warnings.map(esc).join('<br>')));
+    if (!S.edits.length) box.appendChild(el('p', 'warn', 'Aucune modification appliquée : le fichier est identique à l’original.'));
 
-    $('modalTitle').textContent = name;
-    $('modalBody').innerHTML = html;
-    var a = $('download');
-    if (a.dataset.url) URL.revokeObjectURL(a.dataset.url);
-    var url = URL.createObjectURL(new Blob([text], { type: 'application/gpx+xml' }));
-    a.href = url; a.download = name; a.dataset.url = url;
-    $('modal').hidden = false;
+    var blob = new Blob([out.text], { type: 'application/gpx+xml' });
+    var url = URL.createObjectURL(blob);
+    var a = el('a', 'btn accent', 'Télécharger le GPX');
+    a.href = url; a.download = out.name;
+    a.style.display = 'block'; a.style.textAlign = 'center'; a.style.textDecoration = 'none';
+    box.appendChild(a);
+
+    try {
+      var file = new File([out.text], out.name, { type: 'application/gpx+xml' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        var share = el('button', 'btn wide', 'Partager / enregistrer dans Fichiers');
+        share.style.marginTop = '8px';
+        share.addEventListener('click', function () {
+          navigator.share({ files: [file], title: out.name }).catch(function () {});
+        });
+        box.appendChild(share);
+      }
+    } catch (e) { /* File() indisponible : le téléchargement suffit */ }
+
+    box.appendChild(el('p', 'dim',
+      'Import : ouvrez strava.com/upload et choisissez le fichier. Strava refuse un doublon : ' +
+      'supprimez d’abord l’activité d’origine.'));
+    return box;
   }
 
   function tr(k, v) { return '<tr><td>' + k + '</td><td>' + v + '</td></tr>'; }
 
-  /* ------------------------------------------------------------------ wire */
+  function helpHtml() {
+    return '<h3>Graphes</h3><ul class="msgs">' +
+      '<li><b>un doigt</b> : sélectionner un tronçon</li>' +
+      '<li><b>deux doigts</b> : zoomer et se déplacer — tous les graphes restent synchronisés</li>' +
+      '<li><b>double-tap</b> : revenir à la vue complète</li>' +
+      '<li>la bande du bas montre le profil complet et la position de la vue ; faites-la glisser pour vous déplacer</li>' +
+      '<li>onglet <b>Graphes</b> : choisir les séries affichées et figer un axe Y entre deux valeurs</li></ul>' +
+      '<h3>Carte</h3><ul class="msgs">' +
+      '<li>la portion visible dans les graphes est en bleu vif, la sélection en orange</li>' +
+      '<li><b>Sélection</b> : glissez le long du tracé pour choisir un tronçon</li>' +
+      '<li>deux doigts pour zoomer ; la poignée sous la carte règle sa hauteur</li></ul>' +
+      '<h3>Retouche</h3><ul class="msgs">' +
+      '<li>choisissez la consigne, puis les filtres : seuls les points correspondants sont accélérés</li>' +
+      '<li>les modifications s’empilent ; on peut en enchaîner sur plusieurs tronçons</li>' +
+      '<li>la courbe orange sur le graphe de vitesse montre le résultat</li></ul>' +
+      '<h3>Export</h3><p class="dim">Même structure que le fichier d’entrée, mêmes horodatages avant la première ' +
+      'retouche, positions recalculées le long du tracé d’origine, vérification GPX 1.1 avant téléchargement.</p>';
+  }
+
+  /* ------------------------------------------------------------ câblage UI */
+
+  function readFile(f) {
+    if (!f) return;
+    var fr = new FileReader();
+    fr.onload = function () { loadText(String(fr.result), f.name); };
+    fr.readAsText(f);
+  }
+
+  function splitLandscape() {
+    return window.matchMedia('(orientation: landscape) and (max-height: 560px)').matches;
+  }
+
+  function applyMapSize() {
+    var pct = MAP_SIZES[mapSize];
+    if (splitLandscape()) {
+      // en paysage la carte occupe une colonne : la grille CSS s'en charge
+      $('mapwrap').style.height = '';
+      $('mapwrap').hidden = false;
+      if (S.map) S.map.resize();
+      if (S.stack) S.stack.resize();
+      return;
+    }
+    $('mapwrap').style.height = pct + '%';
+    $('mapwrap').hidden = pct === 0;
+    $('grabber').style.opacity = pct === 0 ? 0.5 : 1;
+    if (S.map) S.map.resize();
+    if (S.stack) S.stack.resize();
+  }
 
   function wire() {
-    $('file').addEventListener('change', function (ev) {
-      var f = ev.target.files[0];
-      if (!f) return;
-      var fr = new FileReader();
-      fr.onload = function () { loadText(String(fr.result), f.name); };
-      fr.readAsText(f);
-    });
-
-    ['dragover', 'drop'].forEach(function (t) {
-      window.addEventListener(t, function (ev) { ev.preventDefault(); });
-    });
-    window.addEventListener('drop', function (ev) {
-      var f = ev.dataTransfer && ev.dataTransfer.files[0];
-      if (!f) return;
-      var fr = new FileReader();
-      fr.onload = function () { loadText(String(fr.result), f.name); };
-      fr.readAsText(f);
-    });
+    $('file').addEventListener('change', function (ev) { readFile(ev.target.files[0]); });
 
     document.querySelectorAll('.seg[data-x]').forEach(function (b) {
       b.addEventListener('click', function () {
@@ -3093,113 +3285,62 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
         if (S.stack) S.stack.setXMode(b.dataset.x);
       });
     });
-
     $('zoomSel').addEventListener('click', function () { S.stack.zoomToSelection(); });
     $('zoomReset').addEventListener('click', function () { S.stack.resetView(); });
     $('clearSel').addEventListener('click', function () { S.stack.setSelection(null); });
     $('mapFitAll').addEventListener('click', function () { S.map.fitBounds(S.map.bounds); });
-    $('mapFitView').addEventListener('click', function () {
-      var v = S.stack.viewIndices(); S.map.fitBounds(S.map.boundsOf(v.i0, v.i1));
-    });
-    $('mapFitSel').addEventListener('click', function () {
-      if (S.selection) S.map.fitBounds(S.map.boundsOf(S.selection.i0, S.selection.i1));
-    });
+    $('mapFitView').addEventListener('click', function () { var v = S.stack.viewIndices(); S.map.fitBounds(S.map.boundsOf(v.i0, v.i1)); });
+    $('mapFitSel').addEventListener('click', function () { if (S.selection) S.map.fitBounds(S.map.boundsOf(S.selection.i0, S.selection.i1)); });
     $('mapSelect').addEventListener('click', function () {
       S.map.selectMode = !S.map.selectMode;
       this.classList.toggle('on', S.map.selectMode);
-      $('map').style.cursor = S.map.selectMode ? 'crosshair' : 'grab';
     });
 
-    $('mode').addEventListener('change', function () {
-      var m = $('mode').value;
-      $('fTarget').hidden = m !== 'target';
-      $('fFactor').hidden = m !== 'factor';
-      $('fDelta').hidden = m !== 'delta';
-      $('fSpeed').hidden = m !== 'speed';
-      updatePreview();
+    document.querySelectorAll('.tab[data-sheet]').forEach(function (b) {
+      b.addEventListener('click', function () { openSheet(b.dataset.sheet); });
     });
-    ['targetMin', 'targetSec', 'factor', 'delta2', 'speedTarget', 'maxSpeed', 'minSpeed', 'maxFactor', 'ramp', 'smooth']
-      .forEach(function (id) { $(id).addEventListener('input', updatePreview); });
+    $('tabExport').addEventListener('click', function () { openSheet('export'); });
+    $('btnHelp').addEventListener('click', function () { openSheet('help'); });
+    $('sheetClose').addEventListener('click', closeSheet);
+    $('scrim').addEventListener('click', closeSheet);
 
-    $('apply').addEventListener('click', applyEdit);
-    $('resetParams').addEventListener('click', function () {
-      $('mode').value = 'target'; $('mode').dispatchEvent(new Event('change'));
-      $('targetMin').value = 1; $('targetSec').value = 0; $('factor').value = 1.1;
-      $('delta2').value = 3; $('speedTarget').value = 28; $('maxSpeed').value = 0;
-      $('minSpeed').value = 5; $('maxFactor').value = 2.5; $('ramp').value = 15; $('smooth').value = 10;
-      Object.keys(filterState).forEach(function (k) { filterState[k] = { on: false, min: '', max: '' }; });
-      buildFilterRows(); updatePreview();
+    // poignée de redimensionnement de la carte (glisser) + tap pour changer de taille
+    var g = $('grabber'), dragY = null, movedY = false;
+    g.addEventListener('pointerdown', function (ev) {
+      try { g.setPointerCapture(ev.pointerId); } catch (e) { /* pointeur synthétique */ }
+      dragY = { y: ev.clientY, h: $('mapwrap').getBoundingClientRect().height };
+      movedY = false;
     });
-
-    ['optAlign', 'optPower', 'optHr'].forEach(function (id) { $(id).addEventListener('change', updateOverlay); });
-    ['optSpeedSmooth', 'optGradeWin', 'optPause'].forEach(function (id) {
-      $(id).addEventListener('change', function () {
-        if (!S.source) return;
-        var sel = S.selection, view = S.stack.viewIndices(), xmode = S.stack.xMode, edits = S.edits;
-        S.track = Track.build(S.source, analysisOpts());
-        S.stack.setTrack(S.track);
-        S.stack.xMode = xmode;
-        S.map.setTrack(S.track);
-        S.edits = edits;
-        S.stack.setView([S.stack.xArray()[view.i0], S.stack.xArray()[view.i1]]);
-        if (sel) S.stack.setSelectionIndices(sel.i0, sel.i1);
-        buildChannelChips(); renderEdits(); updateOverlay();
-      });
+    g.addEventListener('pointermove', function (ev) {
+      if (!dragY || splitLandscape()) return;
+      var dy = ev.clientY - dragY.y;
+      if (Math.abs(dy) > 3) movedY = true;
+      var h = Math.max(0, Math.min(window.innerHeight * 0.75, dragY.h + dy));
+      $('mapwrap').style.height = h + 'px';
+      $('mapwrap').hidden = h < 8;
+      if (S.map) S.map.resize();
+      if (S.stack) S.stack.resize();
+    });
+    g.addEventListener('pointerup', function () {
+      if (!movedY) { mapSize = (mapSize + 1) % MAP_SIZES.length; applyMapSize(); }
+      dragY = null;
     });
 
-    $('export').addEventListener('click', doExport);
-    $('modalClose').addEventListener('click', function () { $('modal').hidden = true; });
-    $('modal').addEventListener('click', function (ev) { if (ev.target === $('modal')) $('modal').hidden = true; });
-    $('help').addEventListener('click', showHelp);
-
-    document.addEventListener('keydown', function (ev) {
-      if (/input|select|textarea/i.test(ev.target.tagName)) return;
-      if (!S.track) return;
-      if (ev.key === 'z') S.stack.zoomToSelection();
-      else if (ev.key === 'r') S.stack.resetView();
-      else if (ev.key === 'Escape') { S.stack.setSelection(null); $('modal').hidden = true; }
-      else if (ev.key === 'Enter' && S.selection) applyEdit();
-      else if (ev.key === 'm') $('mapSelect').click();
+    window.addEventListener('orientationchange', function () {
+      setTimeout(function () { tuneSizes(); applyMapSize(); }, 300);
     });
-
-    // splitter
-    var sp = $('splitter'), dragging = false;
-    sp.addEventListener('pointerdown', function (ev) { dragging = true; try { sp.setPointerCapture(ev.pointerId); } catch (e) {} });
-    sp.addEventListener('pointermove', function (ev) {
-      if (!dragging) return;
-      var w = Math.max(300, Math.min(window.innerWidth - 360, window.innerWidth - ev.clientX));
-      document.querySelector('.right').style.width = w + 'px';
+    window.addEventListener('resize', function () {
+      tuneSizes();
+      if (S.stack) S.stack.resize();
+      if (S.map) S.map.resize();
     });
-    sp.addEventListener('pointerup', function () { dragging = false; if (S.stack) S.stack.resize(); if (S.map) S.map.resize(); });
-  }
+    // empêcher le zoom double-tap du navigateur sur les zones de dessin
+    document.addEventListener('dblclick', function (ev) {
+      if (ev.target.tagName === 'CANVAS') ev.preventDefault();
+    }, { passive: false });
 
-  function showHelp() {
-    $('modalTitle').textContent = 'Mode d’emploi';
-    $('modalBody').innerHTML =
-      '<h3>Graphes</h3><ul>' +
-      '<li><kbd>glisser</kbd> sélectionne un tronçon · <kbd>maj</kbd>+glisser déplace la vue</li>' +
-      '<li><kbd>molette</kbd> zoome, tous les graphes restent synchronisés</li>' +
-      '<li><kbd>double-clic</kbd> ou <kbd>r</kbd> : vue complète · <kbd>z</kbd> : zoom sur la sélection</li>' +
-      '<li>l’axe Y de chaque graphe s’adapte à la fenêtre visible, ou se fige avec « auto Y » décoché</li>' +
-      '<li>la bande du bas donne le profil complet et la position de la vue</li></ul>' +
-      '<h3>Carte</h3><ul>' +
-      '<li>la portion visible dans les graphes est tracée en bleu vif, la sélection en orange</li>' +
-      '<li>« Sélection sur la carte » (<kbd>m</kbd>) : glissez le long du tracé pour choisir un tronçon</li>' +
-      '<li><kbd>maj</kbd>+glisser inverse le mode en cours</li></ul>' +
-      '<h3>Retouche</h3><ul>' +
-      '<li>choisissez la consigne (temps à gagner, facteur, km/h, vitesse cible)</li>' +
-      '<li>les filtres restreignent la retouche à certains points (pente, vitesse, puissance, FC…) — ' +
-      'l’accélération n’est donc pas uniforme sur le tronçon</li>' +
-      '<li>« Appliquer » empile la modification ; vous pouvez enchaîner d’autres tronçons</li>' +
-      '<li>la courbe orange sur le graphe de vitesse montre le résultat</li></ul>' +
-      '<h3>Export</h3><p>Le fichier reprend la structure du GPX d’origine (mêmes extensions Garmin), ' +
-      'la même cadence d’enregistrement et les mêmes pauses. Les positions des portions retouchées sont ' +
-      'recalculées le long du tracé d’origine pour rester cohérentes avec les nouvelles vitesses, et le ' +
-      'fichier est vérifié avant téléchargement.</p>';
-    $('download').style.display = 'none';
-    $('modal').hidden = false;
-    var restore = function () { $('download').style.display = ''; $('modalClose').removeEventListener('click', restore); };
-    $('modalClose').addEventListener('click', restore);
+    tuneSizes();
+    applyMapSize();
   }
 
   wire();

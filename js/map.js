@@ -66,7 +66,12 @@
   };
 
   TrackMap.prototype.fitBounds = function (b, pad) {
-    if (!b || !this.canvas.clientWidth) return;
+    if (!b) return;
+    if (!(this.canvas.clientWidth > 0 && this.canvas.clientHeight > 0)) {
+      this._pendingFit = b;             // la carte n'a pas encore de taille
+      return;
+    }
+    this._pendingFit = null;
     pad = pad == null ? 28 : pad;
     var w = this.canvas.clientWidth - 2 * pad, h = this.canvas.clientHeight - 2 * pad;
     var dx = Math.max(1e-9, b.x1 - b.x0), dy = Math.max(1e-9, b.y1 - b.y0);
@@ -115,6 +120,36 @@
   TrackMap.prototype._bind = function () {
     var self = this, drag = null;
     var c = this.canvas;
+    var pts = new Map();      // active pointers, for pinch zoom
+    var pinch = null;
+
+    function pos(ev) {
+      var r = c.getBoundingClientRect();
+      return [ev.clientX - r.left, ev.clientY - r.top];
+    }
+    function startPinch() {
+      var ids = Array.from(pts.keys());
+      if (ids.length < 2) return;
+      var p1 = pts.get(ids[0]), p2 = pts.get(ids[1]);
+      var mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+      pinch = {
+        a: ids[0], b: ids[1], z0: self.z,
+        dist0: Math.max(1, Math.hypot(p2[0] - p1[0], p2[1] - p1[1])),
+        world: self.fromPx(mid[0], mid[1])
+      };
+      drag = null;
+    }
+    function movePinch() {
+      var p1 = pts.get(pinch.a), p2 = pts.get(pinch.b);
+      if (!p1 || !p2) return;
+      var dist = Math.max(1, Math.hypot(p2[0] - p1[0], p2[1] - p1[1]));
+      var mid = [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2];
+      self.z = Math.max(1, Math.min(SOURCES[self.source].max, pinch.z0 + Math.log2(dist / pinch.dist0)));
+      var s = self.scale();
+      self.cx = pinch.world[0] - (mid[0] - c.clientWidth / 2) / s;
+      self.cy = pinch.world[1] - (mid[1] - c.clientHeight / 2) / s;
+      self.draw();
+    }
     c.addEventListener('wheel', function (ev) {
       ev.preventDefault();
       var r = c.getBoundingClientRect();
@@ -128,7 +163,9 @@
     }, { passive: false });
 
     c.addEventListener('pointerdown', function (ev) {
-      c.setPointerCapture(ev.pointerId);
+      try { c.setPointerCapture(ev.pointerId); } catch (e) { /* pointeur synthétique */ }
+      pts.set(ev.pointerId, pos(ev));
+      if (pts.size >= 2) { startPinch(); return; }
       var r = c.getBoundingClientRect();
       var px = ev.clientX - r.left, py = ev.clientY - r.top;
       var selecting = self.selectMode !== ev.shiftKey;  // shift inverts the mode
@@ -143,6 +180,8 @@
       }
     });
     c.addEventListener('pointermove', function (ev) {
+      if (pts.has(ev.pointerId)) pts.set(ev.pointerId, pos(ev));
+      if (pinch) { movePinch(); return; }
       var r = c.getBoundingClientRect();
       var px = ev.clientX - r.left, py = ev.clientY - r.top;
       if (drag && drag.select) {
@@ -158,7 +197,10 @@
         self.opts.onHover(nr && nr.dist < 30 ? nr.index : null);
       }
     });
-    function end() {
+    function end(ev) {
+      if (ev && ev.pointerId != null) pts.delete(ev.pointerId);
+      if (pinch && pts.size < 2) { pinch = null; return; }
+      if (pinch) return;
       if (drag && drag.select && self.opts.onSelectEnd) self.opts.onSelectEnd();
       drag = null;
     }
@@ -173,6 +215,13 @@
     var c = this.canvas;
     c.width = Math.max(1, Math.round(c.clientWidth * dpr));
     c.height = Math.max(1, Math.round(c.clientHeight * dpr));
+    if (this._pendingFit && c.clientWidth > 0 && c.clientHeight > 0) {
+      this.fitBounds(this._pendingFit);
+      return;
+    }
+    if (!isFinite(this.z) || !isFinite(this.cx) || !isFinite(this.cy)) {
+      if (this.bounds) { this.fitBounds(this.bounds); return; }
+    }
     this.draw();
   };
 
@@ -214,7 +263,7 @@
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = '#0b1119';
     ctx.fillRect(0, 0, w, h);
-    if (!this.track) return;
+    if (!this.track || !(w > 0 && h > 0) || !isFinite(this.z) || !isFinite(this.cx) || !isFinite(this.cy)) return;
 
     // --- tiles
     var src = SOURCES[this.source];

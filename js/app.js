@@ -505,7 +505,7 @@
 
     // splitter
     var sp = $('splitter'), dragging = false;
-    sp.addEventListener('pointerdown', function (ev) { dragging = true; sp.setPointerCapture(ev.pointerId); });
+    sp.addEventListener('pointerdown', function (ev) { dragging = true; try { sp.setPointerCapture(ev.pointerId); } catch (e) {} });
     sp.addEventListener('pointermove', function (ev) {
       if (!dragging) return;
       var w = Math.max(300, Math.min(window.innerWidth - 360, window.innerWidth - ev.clientX));

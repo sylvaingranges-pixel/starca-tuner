@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#070c12">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Starca Tuner — mobile</title>
+<link rel="stylesheet" href="css/mobile.css">
+</head>
+<body>
+
+<header class="bar">
+  <label class="iconbtn" aria-label="Ouvrir un fichier GPX">
+    <svg viewBox="0 0 24 24"><path d="M4 6h6l2 2h8v10H4z"/></svg>
+    <input type="file" id="file" accept=".gpx,application/gpx+xml" hidden>
+  </label>
+  <div class="titlebox">
+    <div id="title">Starca Tuner</div>
+    <div id="sub">Ouvrez un GPX exporté de Strava ou de Garmin Connect</div>
+  </div>
+  <button class="iconbtn" id="btnHelp" aria-label="Aide">?</button>
+</header>
+
+<div class="toolbar">
+  <span class="seg2"><button class="seg on" data-x="time">Temps</button><button class="seg" data-x="dist">Distance</button></span>
+  <button class="tb" id="zoomSel" disabled>⤢ sél.</button>
+  <button class="tb" id="zoomReset">⤢ tout</button>
+  <button class="tb" id="clearSel" disabled>✕ sél.</button>
+  <span class="grow"></span>
+  <span id="gain" class="gain"></span>
+</div>
+
+<section class="mapwrap" id="mapwrap">
+  <canvas id="map"></canvas>
+  <div class="mapctl">
+    <button class="mb" id="mapSelect">Sélection</button>
+    <button class="mb" id="mapFitAll">Tout</button>
+    <button class="mb" id="mapFitView">Vue</button>
+    <button class="mb" id="mapFitSel" disabled>Sél.</button>
+  </div>
+</section>
+<div class="grabber" id="grabber"><span></span></div>
+
+<main class="charts" id="charts"></main>
+<div id="chartFooter" class="chartfoot"></div>
+
+<div class="empty" id="empty">
+  <h1>Retouche de sorties vélo</h1>
+  <p>Toutes les séries du fichier s’affichent, synchronisées avec la carte.
+     Sélectionnez un tronçon, filtrez les points à accélérer, puis exportez un GPX
+     réimportable dans Strava.</p>
+  <p class="dim">Un doigt&nbsp;: sélectionner · deux doigts&nbsp;: zoomer et se déplacer ·
+     double-tap&nbsp;: vue complète.</p>
+  <p class="dim">Tout reste sur votre téléphone&nbsp;; seules les tuiles de la carte sont téléchargées.</p>
+</div>
+
+<nav class="tabs">
+  <button class="tab" data-sheet="channels"><b>Graphes</b><span>séries · axes Y</span></button>
+  <button class="tab" data-sheet="edit" id="tabEdit"><b>Retoucher</b><span id="tabEditSub">sélection</span></button>
+  <button class="tab" data-sheet="opts"><b>Réglages</b><span id="tabOptsSub">0 modif.</span></button>
+  <button class="tab accent" id="tabExport" disabled><b>Exporter</b><span>GPX</span></button>
+</nav>
+
+<div class="scrim" id="scrim" hidden></div>
+<section class="sheet" id="sheet" hidden>
+  <div class="sheethead">
+    <span class="pull"></span>
+    <h2 id="sheetTitle">—</h2>
+    <button class="iconbtn" id="sheetClose" aria-label="Fermer">✕</button>
+  </div>
+  <div class="sheetbody" id="sheetBody"></div>
+</section>
+
+<script src="js/xml.js"></script>
+<script src="js/gpx.js"></script>
+<script src="js/track.js"></script>
+<script src="js/edit.js"></script>
+<script src="js/validate.js"></script>
+<script src="js/ui-common.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/map.js"></script>
+<script src="js/app-mobile.js"></script>
+</body>
+</html>

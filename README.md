@@ -9,13 +9,36 @@ dans le navigateur. Seules les tuiles du fond de carte viennent d'Internet.
 
 ## Lancer l'application
 
-Deux possibilités :
+Deux interfaces, le même moteur, toutes deux dans un simple onglet de navigateur :
 
-* **fichier unique** — ouvrez `starca-tuner.html` (double-clic, ou glissez-le dans un onglet).
-  Tout y est embarqué : c'est le fichier à copier sur une clé ou une autre machine ;
-* **arborescence** — ouvrez `index.html` (même contenu, code séparé en modules).
+| | fichier unique | arborescence |
+| --- | --- | --- |
+| **ordinateur** | `starca-tuner.html` | `index.html` |
+| **smartphone** | `starca-tuner-mobile.html` | `mobile.html` |
 
-Le fichier unique se régénère après modification du code avec `node tools/build-single.js`.
+Les fichiers uniques embarquent tout (aucune dépendance) : ce sont ceux à copier sur une clé,
+un téléphone ou une autre machine. Ils se régénèrent avec `node tools/build-single.js`.
+
+### Version smartphone
+
+Même chaîne de traitement et mêmes fonctions que la version bureau, avec une disposition
+verticale et des gestes tactiles :
+
+* **un doigt** sur un graphe : sélectionner un tronçon · **deux doigts** : zoomer et se
+  déplacer, tous les graphes restant synchronisés · **double-tap** : vue complète ;
+* carte au-dessus des graphes, hauteur réglable en faisant glisser la poignée (un appui
+  fait défiler trois tailles, jusqu'au plein écran) ; deux doigts pour zoomer sur la carte ;
+* trois séries affichées au départ pour rester lisible — l'onglet **Graphes** permet
+  d'afficher toutes les autres et de figer un axe Y entre deux valeurs ;
+* la retouche, les modifications empilées, les réglages et l'export s'ouvrent en
+  **feuilles glissantes** depuis la barre du bas ;
+* en paysage, la carte passe à gauche et les graphes à droite ;
+* à l'export, un bouton **Partager** apparaît quand le navigateur le permet (iOS, Android) :
+  le GPX part directement vers Fichiers, Drive ou l'appli Strava.
+
+Pour l'installer sur le téléphone : ouvrez `starca-tuner-mobile.html` (depuis Fichiers,
+Drive ou un partage local) puis « Ajouter à l'écran d'accueil » — la page fonctionne
+ensuite comme une application, hors ligne, sauf le fond de carte.
 
 ## Quel fichier donner à l'application ?
 
@@ -119,7 +142,8 @@ node tools/test-all.js                    # toute la chaîne de vérification
 node tools/make-sample.js                 # regénère les exemples synthétiques
 node tools/selftest.js [fichier.gpx]      # tests du moteur (lecture, édition, export)
 node tools/validate-gpx.js fichier.gpx    # validation GPX 1.1 en ligne de commande
-node tools/uitest.js [fichier.gpx]        # test d'interface (Playwright + Chromium)
+node tools/uitest.js [fichier.gpx]        # test d'interface bureau (Playwright + Chromium)
+node tools/uitest-mobile.js [fichier.gpx] # test d'interface mobile (viewport iPhone, gestes)
 node tools/build-single.js                # regénère starca-tuner.html
 ```
 
@@ -134,7 +158,9 @@ Découpage du code :
 | `js/validate.js` | contrôle GPX 1.1 / Strava |
 | `js/charts.js` | graphes synchronisés (canvas) |
 | `js/map.js` | carte à tuiles (canvas, sans bibliothèque) |
-| `js/app.js` | interface et enchaînement |
+| `js/ui-common.js` | fonctions partagées par les deux interfaces (mise en forme, statistiques, export) |
+| `js/app.js` | interface bureau |
+| `js/app-mobile.js` | interface smartphone |
 
 Les fichiers `sample/sample-ride.gpx` (mise en forme Garmin Connect) et
 `sample/sample-ride-strava.gpx` (mise en forme Strava : préfixe `gpxtpx:`, `<power>` en

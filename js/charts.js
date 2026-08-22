@@ -37,6 +37,10 @@
     this.hoverX = null;
     this.overlays = {};
     this.rowHeight = 108;
+    this.gutter = (opts && opts.gutter) || GUTTER;
+    this.compactHead = !!(opts && opts.compactHead);
+    this.minRow = (opts && opts.minRowHeight) || 64;
+    this.touch = !!(opts && opts.touch);
     this._raf = null;
     this._drag = null;
     var self = this;
@@ -87,17 +91,18 @@
       var wrap = document.createElement('div');
       wrap.className = 'chart-row';
       wrap.dataset.key = row.ch.key;
+      var headControls = self.compactHead ? '' :
+        '<label class="yauto"><input type="checkbox" checked> auto Y</label>' +
+        '<input class="ymin" type="number" step="any" placeholder="min" disabled>' +
+        '<input class="ymax" type="number" step="any" placeholder="max" disabled>' +
+        '<button class="hidebtn" title="Masquer ce graphe">✕</button>';
       wrap.innerHTML =
         '<div class="chart-head">' +
         '<span class="dot" style="background:' + row.ch.color + '"></span>' +
         '<span class="lbl">' + row.ch.label + '</span>' +
         '<span class="unit">' + (row.ch.unit ? '(' + row.ch.unit + ')' : '') + '</span>' +
         '<span class="cursor-val"></span>' +
-        '<span class="spacer"></span>' +
-        '<label class="yauto"><input type="checkbox" checked> auto Y</label>' +
-        '<input class="ymin" type="number" step="any" placeholder="min" disabled>' +
-        '<input class="ymax" type="number" step="any" placeholder="max" disabled>' +
-        '<button class="hidebtn" title="Masquer ce graphe">✕</button>' +
+        '<span class="spacer"></span>' + headControls +
         '</div>' +
         '<canvas></canvas>';
       self.el.appendChild(wrap);
@@ -106,7 +111,7 @@
       row.ctx = row.canvas.getContext('2d');
       row.valEl = wrap.querySelector('.cursor-val');
       var auto = wrap.querySelector('.yauto input'), ymin = wrap.querySelector('.ymin'), ymax = wrap.querySelector('.ymax');
-      auto.addEventListener('change', function () {
+      if (auto) auto.addEventListener('change', function () {
         row.yMode = auto.checked ? 'auto' : 'fixed';
         ymin.disabled = ymax.disabled = auto.checked;
         if (!auto.checked) {
@@ -122,9 +127,10 @@
         row.yMax = ymax.value === '' ? null : parseFloat(ymax.value);
         self.draw();
       }
-      ymin.addEventListener('input', onY);
-      ymax.addEventListener('input', onY);
-      wrap.querySelector('.hidebtn').addEventListener('click', function () {
+      if (ymin) ymin.addEventListener('input', onY);
+      if (ymax) ymax.addEventListener('input', onY);
+      var hideBtn = wrap.querySelector('.hidebtn');
+      if (hideBtn) hideBtn.addEventListener('click', function () {
         row.visible = false; wrap.style.display = 'none';
         if (self.opts.onRowsChanged) self.opts.onRowsChanged();
       });
@@ -149,6 +155,32 @@
     this._bindOverview(this.ovCanvas);
   };
 
+  /** Read the rows so an external panel can drive them. */
+  ChartStack.prototype.getRows = function () {
+    return this.rows.map(function (r) {
+      return { key: r.ch.key, label: r.ch.label, unit: r.ch.unit, color: r.ch.color,
+        decimals: r.ch.decimals, visible: r.visible, yMode: r.yMode, yMin: r.yMin, yMax: r.yMax };
+    });
+  };
+
+  /** Set visibility / Y scaling of a row from outside. */
+  ChartStack.prototype.setRowConfig = function (key, cfg) {
+    var row = null;
+    for (var i = 0; i < this.rows.length; i++) if (this.rows[i].ch.key === key) row = this.rows[i];
+    if (!row) return;
+    if (cfg.visible != null) { row.visible = cfg.visible; row.el.style.display = cfg.visible ? '' : 'none'; }
+    if (cfg.yMode) row.yMode = cfg.yMode;
+    if ('yMin' in cfg) row.yMin = cfg.yMin;
+    if ('yMax' in cfg) row.yMax = cfg.yMax;
+    if (cfg.visible != null) this.resize(); else this.draw();
+  };
+
+  /** Auto-scale range of a row on the current window (for prefilling inputs). */
+  ChartStack.prototype.autoRange = function (key) {
+    for (var i = 0; i < this.rows.length; i++) if (this.rows[i].ch.key === key) return this._yRange(this.rows[i]);
+    return [0, 1];
+  };
+
   ChartStack.prototype.setRowVisible = function (key, vis) {
     var row = this.rows.find(function (r) { return r.ch.key === key; });
     if (!row) return;
@@ -157,19 +189,46 @@
     this.resize();
   };
 
-  ChartStack.prototype.plotWidth = function (canvas) { return canvas.clientWidth - GUTTER - 8; };
+  ChartStack.prototype.plotWidth = function (canvas) { return canvas.clientWidth - this.gutter - 8; };
 
   ChartStack.prototype.xToPix = function (x, canvas) {
     var w = this.plotWidth(canvas);
-    return GUTTER + (x - this.view[0]) / (this.view[1] - this.view[0]) * w;
+    return this.gutter + (x - this.view[0]) / (this.view[1] - this.view[0]) * w;
   };
   ChartStack.prototype.pixToX = function (px, canvas) {
     var w = this.plotWidth(canvas);
-    return this.view[0] + (px - GUTTER) / w * (this.view[1] - this.view[0]);
+    return this.view[0] + (px - this.gutter) / w * (this.view[1] - this.view[0]);
   };
 
   ChartStack.prototype._bindCanvas = function (canvas) {
     var self = this;
+    var pts = new Map();      // active pointers, for two-finger gestures
+    var pinch = null;
+
+    function startPinch() {
+      var ids = Array.from(pts.keys());
+      if (ids.length < 2) return;
+      if (self._drag) { self.selection = self._selBefore || null; self._drag = null; self.draw(); }
+      pinch = {
+        a: { id: ids[0], d: self.pixToX(pts.get(ids[0]), canvas) },
+        b: { id: ids[1], d: self.pixToX(pts.get(ids[1]), canvas) }
+      };
+    }
+
+    function movePinch() {
+      var p1 = pts.get(pinch.a.id), p2 = pts.get(pinch.b.id);
+      if (p1 == null || p2 == null) return;
+      if (Math.abs(p2 - p1) < 8) return;
+      var plotW = self.plotWidth(canvas);
+      var scale = (pinch.b.d - pinch.a.d) / (p2 - p1);       // domain units per pixel
+      var minSpan = (self.xMode === 'dist' ? 20 : 5) / plotW;
+      var maxSpan = self.xMax() / plotW;
+      if (!isFinite(scale)) return;
+      scale = Math.max(minSpan, Math.min(maxSpan, Math.abs(scale)));
+      var v0 = pinch.a.d - (p1 - self.gutter) * scale;
+      self.setView([v0, v0 + plotW * scale]);
+    }
+
     canvas.addEventListener('wheel', function (ev) {
       ev.preventDefault();
       var x = self.pixToX(ev.offsetX, canvas);
@@ -179,12 +238,17 @@
 
     canvas.addEventListener('pointerdown', function (ev) {
       if (ev.button === 2) return;
-      canvas.setPointerCapture(ev.pointerId);
+      try { canvas.setPointerCapture(ev.pointerId); } catch (e) { /* pointeur synthétique */ }
+      pts.set(ev.pointerId, ev.offsetX);
+      if (self.touch && pts.size >= 2) { startPinch(); return; }
       var pan = ev.shiftKey || ev.button === 1;
+      self._selBefore = self.selection;
       self._drag = { canvas: canvas, pan: pan, startPx: ev.offsetX, startX: self.pixToX(ev.offsetX, canvas), moved: false };
       if (!pan) { self.selection = null; self.draw(); }
     });
     canvas.addEventListener('pointermove', function (ev) {
+      if (pts.has(ev.pointerId)) pts.set(ev.pointerId, ev.offsetX);
+      if (pinch) { movePinch(); return; }
       var x = self.pixToX(ev.offsetX, canvas);
       if (self._drag && self._drag.canvas === canvas) {
         var d = self._drag;
@@ -199,6 +263,9 @@
       self.setHover(x);
     });
     function endDrag(ev) {
+      if (ev && ev.pointerId != null) pts.delete(ev.pointerId);
+      if (pinch && pts.size < 2) { pinch = null; if (self.opts.onView) self.opts.onView(self.viewIndices()); return; }
+      if (pinch) return;
       if (self._drag && self._drag.canvas === canvas) {
         var d = self._drag;
         self._drag = null;
@@ -214,6 +281,7 @@
   };
 
   ChartStack.prototype._bindOverview = function (canvas) {
+    var GUTTER = this.gutter;
     var self = this;
     function xOf(px) {
       var w = self.plotWidth(canvas);
@@ -221,7 +289,7 @@
     }
     var drag = null;
     canvas.addEventListener('pointerdown', function (ev) {
-      canvas.setPointerCapture(ev.pointerId);
+      try { canvas.setPointerCapture(ev.pointerId); } catch (e) { /* pointeur synthétique */ }
       var x = xOf(ev.offsetX);
       var span = self.view[1] - self.view[0];
       drag = { x: x, span: span };
@@ -341,7 +409,7 @@
       heads += (hd ? hd.offsetHeight : 22) + 1;
     });
     var avail = this.el.clientHeight - 2 - heads;
-    var rowH = Math.max(64, Math.min(150, Math.floor(avail / nVis)));
+    var rowH = Math.max(this.minRow, Math.min(150, Math.floor(avail / nVis)));
     this.rows.forEach(function (row) {
       if (!row.visible) return;
       var c = row.canvas;
@@ -396,6 +464,7 @@
   };
 
   ChartStack.prototype._drawRow = function (row) {
+    var GUTTER = this.gutter;
     var self = this;
     var ctx = row.ctx, c = row.canvas;
     var dpr = global.devicePixelRatio || 1;
@@ -466,6 +535,7 @@
 
   /** Draws a series, decimated to one min/max column per pixel when dense. */
   ChartStack.prototype._drawSeries = function (ctx, data, ch, toX, toY, plotW, h, overlay) {
+    var GUTTER = this.gutter;
     var x = this.xArray();
     var i0 = this.idxAt(this.view[0]), i1 = this.idxAt(this.view[1]);
     if (i1 <= i0) return;
@@ -531,6 +601,7 @@
   };
 
   ChartStack.prototype._drawAxis = function () {
+    var GUTTER = this.gutter;
     var ctx = this.axisCtx, c = this.axisCanvas;
     if (!ctx) return;
     var dpr = global.devicePixelRatio || 1;
@@ -549,12 +620,15 @@
       ctx.textAlign = 'center';
       ctx.fillText(self.fmtX(tv), px, 3);
     });
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#4d6070';
-    ctx.fillText(this.xMode === 'dist' ? 'distance' : 'temps', 4, 3);
+    if (w > 430 && GUTTER >= 50) {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#4d6070';
+      ctx.fillText(this.xMode === 'dist' ? 'distance' : 'temps', 4, 3);
+    }
   };
 
   ChartStack.prototype._drawOverview = function () {
+    var GUTTER = this.gutter;
     var ctx = this.ovCtx, c = this.ovCanvas;
     if (!ctx) return;
     var dpr = global.devicePixelRatio || 1;

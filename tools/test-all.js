@@ -13,5 +13,6 @@ run(['tools/make-sample.js'], 'génération des exemples');
 for (const f of fixtures) run(['tools/selftest.js', f], 'moteur — ' + f);
 for (const f of fixtures) run(['tools/validate-gpx.js', f], 'validation — ' + f);
 run(['tools/build-single.js'], 'bundle fichier unique');
-for (const f of fixtures) run(['tools/uitest.js', f], 'interface — ' + f);
+for (const f of fixtures) run(['tools/uitest.js', f], 'interface bureau — ' + f);
+run(['tools/uitest-mobile.js', fixtures[1]], 'interface mobile — ' + fixtures[1]);
 console.log('\nTout est vert.');
