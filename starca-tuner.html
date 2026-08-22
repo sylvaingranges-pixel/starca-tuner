@@ -2475,9 +2475,9 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
       ctx.textAlign = 'center'; ctx.textBaseline = 'top';
       var mw = ctx.measureText(msg).width;
       ctx.fillStyle = 'rgba(11,17,25,0.82)';
-      ctx.fillRect(w / 2 - mw / 2 - 8, 44, mw + 16, 20);
+      ctx.fillRect(w / 2 - mw / 2 - 8, h / 2 - 10, mw + 16, 20);
       ctx.fillStyle = '#f59e0b';
-      ctx.fillText(msg, w / 2, 47);
+      ctx.fillText(msg, w / 2, h / 2 - 7);
     }
 
     if (src.attr) {
