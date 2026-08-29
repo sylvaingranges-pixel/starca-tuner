@@ -15,7 +15,7 @@
     maxSpeedKmh: 0, minSpeedKmh: 5, maxFactor: 2.5, rampSec: 15, smoothSec: 10
   };
   var O = {                                   // options globales
-    align: true, power: false, hr: false, tile: 'osm',
+    align: true, power: false, hr: false, tile: 'osm', startMs: null,
     mass: 83, cda: 0.32, crr: 0.005, hrMax: 190,
     speedSmooth: 5, gradeWindow: 40, pauseGap: 10
   };
@@ -42,6 +42,7 @@
     }
     S.fileName = name; S.source = source; S.track = track;
     S.edits = []; S.selection = null; S.pending = null;
+    O.startMs = track.t0Ms;
     $('empty').hidden = true;
     $('tabExport').disabled = false;
 
@@ -115,8 +116,10 @@
     if (!S.track || !S.stack) return;
     var list = S.edits.slice();
     if (S.pending) list.push(S.pending);
-    var ov = UI.overlaySpeed(S.track, list);
-    S.stack.setOverlay('speed', ov.data);
+    var ov = UI.overlays(S.track, list, {
+      power: O.power, hr: O.hr, mass: O.mass, cda: O.cda, crr: O.crr, hrMax: O.hrMax
+    });
+    S.stack.setOverlays(ov.data);
 
     var applied = Edits.composeFactors(S.track, S.edits);
     var saved = Edits.savedTime(S.track, applied.factor, 0, applied.factor.length);
@@ -412,6 +415,36 @@
     phys.appendChild(numField('FC maximale', O.hrMax, 'bpm', function (v) { O.hrMax = v; }, 100, 1));
     box.appendChild(phys);
 
+    box.appendChild(el('h3', null, 'Date de la sortie'));
+    var df = el('div', 'field');
+    df.appendChild(el('label', null, 'Départ'));
+    var dv = el('div', 'val');
+    var dinp = document.createElement('input');
+    dinp.type = 'datetime-local'; dinp.step = '1'; dinp.className = 'num datetime';
+    dinp.value = UI.toLocalInput(O.startMs || S.track.t0Ms);
+    var dnote = el('div', 'dim', '');
+    function refreshDate() {
+      var ms = UI.fromLocalInput(dinp.value);
+      if (isFinite(ms)) O.startMs = ms;
+      dnote.textContent = UI.describeShift((O.startMs || S.track.t0Ms) - S.track.t0Ms);
+    }
+    dinp.addEventListener('input', refreshDate);
+    dv.appendChild(dinp);
+    df.appendChild(dv);
+    box.appendChild(df);
+    var dreset = el('button', 'btn wide', 'Revenir à la date d’origine');
+    dreset.addEventListener('click', function () {
+      O.startMs = S.track.t0Ms;
+      dinp.value = UI.toLocalInput(O.startMs);
+      refreshDate();
+    });
+    box.appendChild(dreset);
+    box.appendChild(dnote);
+    box.appendChild(el('p', 'dim',
+      'Strava refuse une activité dont la date de départ existe déjà : décalez-la pour importer ' +
+      'la version retouchée à côté de l’originale.'));
+    refreshDate();
+
     box.appendChild(el('h3', null, 'Carte'));
     var f = el('div', 'field');
     f.appendChild(el('label', null, 'Fond de carte'));
@@ -468,6 +501,7 @@
   function exportPanel() {
     var box = el('div');
     var out = UI.buildExport(S.track, S.source, S.edits, {
+      startMs: O.startMs,
       align: O.align,
       adjust: { power: O.power, hr: O.hr, mass: O.mass, cda: O.cda, crr: O.crr, hrMax: O.hrMax }
     }, S.fileName);

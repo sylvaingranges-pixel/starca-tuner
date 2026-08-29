@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const root = path.join(__dirname, '..');
-for (const f of ['js/xml.js', 'js/gpx.js', 'js/track.js', 'js/edit.js']) require(path.join(root, f));
+for (const f of ['js/xml.js', 'js/gpx.js', 'js/track.js', 'js/edit.js', 'js/validate.js', 'js/ui-common.js']) require(path.join(root, f));
 
 const file = process.argv[2] || path.join(root, 'sample/activity_23212011494.gpx');
 const text = fs.readFileSync(file, 'utf8');
@@ -147,6 +147,63 @@ for (let i = Math.round(track.n * 0.03); i < Math.round(track.n * 0.08); i++) {
 console.log(`  FC moyenne du tronçon : ${(hrBefore / cnt).toFixed(1)} -> ${(hrAfter / cnt).toFixed(1)} bpm`);
 check('FC ajustée à la hausse', hrAfter > hrBefore);
 check('gain de temps positif', r2.stats.savedSec > 0, r2.stats.savedSec.toFixed(1) + ' s');
+
+console.log('\n[5] Aperçu « après retouche » et export : mêmes valeurs');
+{
+  const e = Edits.defaultEdit(track, Math.round(track.n * 0.2), Math.round(track.n * 0.5));
+  e.mode = 'factor'; e.factor = 1.2; e.filters = []; e.rampSec = 0; e.smoothSec = 0;
+  const adjust = { power: true, hr: true, mass: 83, cda: 0.32, crr: 0.005, hrMax: 195 };
+  const ov = UI.overlays(track, [e], adjust);
+  const pKey = ov.powerKey, hKey = ov.hrKey;
+  if (!pKey) {
+    console.log('  (fichier sans puissance : contrôle de la vitesse seule)');
+    check('aperçu de vitesse produit', !!ov.data.speed);
+  } else {
+    const pCh = track.channels.find(c => c.key === pKey);
+    let n = 0, sumBefore = 0, sumOver = 0, d0 = Infinity, d1 = -Infinity;
+    for (let i = e.i0; i <= e.i1; i++) {
+      const a = pCh.data[i], b = ov.data[pKey][i];
+      if (!isFinite(a) || !isFinite(b)) continue;
+      n++; sumBefore += a; sumOver += b;
+      d0 = Math.min(d0, track.dist[i]); d1 = Math.max(d1, track.dist[i]);
+    }
+    check('aperçu de puissance produit', n > 0 && sumOver > sumBefore,
+      `${(sumBefore / n).toFixed(0)} W -> ${(sumOver / n).toFixed(0)} W sur ${n} points`);
+    check('aperçu de FC produit', !!(hKey && ov.data[hKey]));
+
+    // la même retouche exportée doit porter la même puissance sur le même tronçon
+    const out = UI.buildExport(track, src, [e], { align: true, adjust: adjust }, 'x.gpx');
+    const t2 = Track.build(GPX.parse(out.text));
+    const p2 = t2.channels.find(c => c.key === pKey);
+    let m = 0, sumOut = 0;
+    for (let i = 0; i < t2.n; i++) {
+      if (t2.dist[i] < d0 || t2.dist[i] > d1) continue;
+      const v = p2.data[i];
+      if (!isFinite(v)) continue;
+      m++; sumOut += v;
+    }
+    const moyOver = sumOver / n, moyOut = sumOut / m;
+    check('aperçu conforme au fichier exporté (<2 %)', Math.abs(moyOut - moyOver) / moyOver < 0.02,
+      `aperçu ${moyOver.toFixed(0)} W, export ${moyOut.toFixed(0)} W`);
+  }
+}
+
+console.log('\n[6] Changement de la date de la sortie');
+{
+  const newStart = Date.UTC(2027, 2, 8, 5, 30, 0);
+  const out = UI.buildExport(track, src, [], { align: true, startMs: newStart, adjust: {} }, 'x.gpx');
+  check('validation OK', out.check.ok, out.check.errors.join(' | '));
+  check('départ déplacé', Date.parse(out.check.info.start) === newStart, out.check.info.start);
+  check('durée inchangée', Math.abs(out.check.info.durationSec - track.stats.duration) < 1.5,
+    Math.round(out.check.info.durationSec) + ' s');
+  const meta = /<metadata>[\s\S]*?<time>([^<]+)<\/time>/.exec(out.text);
+  const origMeta = /<metadata>[\s\S]*?<time>([^<]+)<\/time>/.exec(text);
+  const shift = newStart - track.t0Ms;
+  check('date de <metadata> décalée d\'autant', !meta || !origMeta ||
+    Date.parse(meta[1]) === Date.parse(origMeta[1]) + shift, meta && meta[1]);
+  const sameDate = UI.buildExport(track, src, [], { align: true, startMs: track.t0Ms, adjust: {} }, 'x.gpx');
+  check('sans décalage, fichier inchangé', sameDate.text === text.replace(/\r\n/g, '\n'));
+}
 
 console.log('\n' + (failures ? failures + ' test(s) en échec' : 'Tous les tests passent'));
 process.exit(failures ? 1 : 0);

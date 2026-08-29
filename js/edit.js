@@ -266,7 +266,7 @@
     var n = track.n, src = track.source, pts = src.points;
 
     var adjust = options.adjust || {};
-    var phys = { mass: adjust.mass || 83, cda: adjust.cda || 0.32, crr: adjust.crr || 0.005, rho: adjust.rho || 1.2, eff: 0.97 };
+    var phys = physFrom(adjust);
     var powerKey = null, hrKey = null;
     for (var c = 0; c < track.channels.length; c++) {
       var ch = track.channels[c];
@@ -412,26 +412,46 @@
     };
   }
 
-  function applyEffortAdjust(track, src, factor, j, p, powerKey, hrKey, phys, adjust) {
+  /**
+   * Rapport puissance nouvelle / puissance d'origine au point j, d'après le
+   * modèle physique. Sert à la fois à l'aperçu dans les graphes et à l'export,
+   * pour que les deux racontent exactement la même chose.
+   */
+  function effortRatio(track, factor, j, phys) {
     var f = factor[Math.min(j, factor.length - 1)];
-    if (!isFinite(f) || Math.abs(f - 1) < 1e-6) return;
+    if (!isFinite(f) || Math.abs(f - 1) < 1e-6) return 1;
     var v = track.vSmooth[j];
-    if (!(v > 1)) return;
+    if (!(v > 1)) return 1;
     var grade = track.grade[j];
     var p0 = powerRequired(v, grade, phys);
     var p1 = powerRequired(v * f, grade, phys);
-    if (!(p0 > 1)) return;
-    var ratio = p1 / p0;
+    if (!(p0 > 1)) return 1;
+    return p1 / p0;
+  }
+
+  /** Fréquence cardiaque suivant la variation de puissance (modèle simple). */
+  function adjustedHr(hr, ratio, hrMax) {
+    return clamp(hr * Math.pow(ratio, 0.35), 35, hrMax || 190);
+  }
+
+  function physFrom(adjust) {
+    adjust = adjust || {};
+    return {
+      mass: adjust.mass || 83, cda: adjust.cda || 0.32,
+      crr: adjust.crr || 0.005, rho: adjust.rho || 1.2, eff: 0.97
+    };
+  }
+
+  function applyEffortAdjust(track, src, factor, j, p, powerKey, hrKey, phys, adjust) {
+    var ratio = effortRatio(track, factor, j, phys);
+    if (ratio === 1) return;
     if (adjust.power && powerKey && p.ext[powerKey] !== undefined) {
       var pw = parseFloat(p.ext[powerKey]);
       if (isFinite(pw)) p.ext[powerKey] = String(Math.max(0, pw * ratio));
     }
     if (adjust.hr && hrKey && p.ext[hrKey] !== undefined) {
       var hr = parseFloat(p.ext[hrKey]);
-      if (isFinite(hr)) {
-        var hrMax = adjust.hrMax || 190;
-        p.ext[hrKey] = String(clamp(hr * Math.pow(ratio, 0.35), 35, hrMax));
-      }
+      if (isFinite(hr)) p.ext[hrKey] = String(adjustedHr(hr, ratio, adjust.hrMax));
     }
   }
 
@@ -453,6 +473,9 @@
     intervalSpeedKmh: intervalSpeedKmh,
     intervalValue: intervalValue,
     powerRequired: powerRequired,
+    effortRatio: effortRatio,
+    adjustedHr: adjustedHr,
+    physFrom: physFrom,
     fmtDur: fmtDur
   };
 })(typeof window !== 'undefined' ? window : globalThis);

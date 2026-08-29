@@ -60,6 +60,9 @@
     S.map.setTrack(track);
     S.map.setView(0, track.n - 1);
 
+    $('startDate').value = UI.toLocalInput(track.t0Ms);
+    updateDateInfo();
+
     buildChannelChips();
     buildFilterRows();
     renderActivity();
@@ -278,23 +281,15 @@
     updateOverlay();
   }
 
-  /** Modified-speed curve = applied edits (+ the one being configured). */
+  /** Courbes « après retouche » : vitesse, et puissance / FC si leur recalcul est coché. */
   function updateOverlay() {
     if (!S.track || !S.stack) return;
     var list = S.edits.slice();
     if (S.pending) list.push(S.pending);
-    var comp = Edits.composeFactors(S.track, list);
-    var t = S.track, n = t.n;
-    var any = false;
-    var over = new Float64Array(n);
-    for (var i = 0; i < n; i++) {
-      var f = i === 0 ? comp.factor[0] : i >= n - 1 ? comp.factor[n - 2] : (comp.factor[i - 1] + comp.factor[i]) / 2;
-      if (!isFinite(f)) f = 1;
-      if (Math.abs(f - 1) > 1e-9) { any = true; over[i] = t.vSmooth[i] * 3.6 * f; }
-      else over[i] = NaN;
-    }
-    S.stack.setOverlay('speed', any ? over : null);
+    var ov = UI.overlays(S.track, list, buildOptions().adjust);
+    S.stack.setOverlays(ov.data);
 
+    var t = S.track;
     var applied = Edits.composeFactors(S.track, S.edits);
     var saved = Edits.savedTime(S.track, applied.factor, 0, applied.factor.length);
     $('delta').textContent = saved ? 'Gain cumulé : ' + fmtDelta(saved) + '  ·  ' +
@@ -353,8 +348,17 @@
 
   /* ---------------------------------------------------------------- export */
 
+  function updateDateInfo() {
+    if (!S.track) return;
+    var ms = UI.fromLocalInput($('startDate').value);
+    var delta = isFinite(ms) ? ms - S.track.t0Ms : 0;
+    $('dateShift').textContent = UI.describeShift(delta);
+  }
+
   function buildOptions() {
+    var startMs = UI.fromLocalInput($('startDate').value);
     return {
+      startMs: isFinite(startMs) ? startMs : null,
       align: $('optAlign').checked,
       adjust: {
         power: $('optPower').checked, hr: $('optHr').checked,
@@ -367,14 +371,12 @@
   }
 
   function doExport() {
-    var comp = Edits.composeFactors(S.track, S.edits);
-    var res = Edits.rebuild(S.track, comp.factor, buildOptions());
-    var text = GPX.build(S.source, res.points);
-    var check = GPXValidate.validate(text);
+    var out = UI.buildExport(S.track, S.source, S.edits, buildOptions(), S.fileName);
+    var res = out.res, text = out.text, check = out.check;
     S.lastResult = res;
 
     var t = S.track;
-    var name = (S.fileName || 'activite.gpx').replace(/\.gpx$/i, '') + '-retouche.gpx';
+    var name = out.name;
     var html = '<table>' +
       tr('Durée', fmtClock(res.stats.oldDuration) + '  →  <b>' + fmtClock(res.stats.newDuration) + '</b>') +
       tr('Gain', '<b>' + fmtDelta(res.stats.savedSec) + '</b>') +
@@ -473,6 +475,7 @@
     });
 
     ['optAlign', 'optPower', 'optHr'].forEach(function (id) { $(id).addEventListener('change', updateOverlay); });
+    ['mass', 'cda', 'crr', 'hrMax'].forEach(function (id) { $(id).addEventListener('input', updateOverlay); });
     ['optSpeedSmooth', 'optGradeWin', 'optPause'].forEach(function (id) {
       $(id).addEventListener('change', function () {
         if (!S.source) return;
@@ -486,6 +489,13 @@
         if (sel) S.stack.setSelectionIndices(sel.i0, sel.i1);
         buildChannelChips(); renderEdits(); updateOverlay();
       });
+    });
+
+    $('startDate').addEventListener('input', updateDateInfo);
+    $('resetDate').addEventListener('click', function () {
+      if (!S.track) return;
+      $('startDate').value = UI.toLocalInput(S.track.t0Ms);
+      updateDateInfo();
     });
 
     $('export').addEventListener('click', doExport);

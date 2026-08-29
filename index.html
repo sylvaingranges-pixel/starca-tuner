@@ -146,6 +146,20 @@
       </div>
 
       <div class="card">
+        <h2>Date de la sortie</h2>
+        <div class="field">
+          <label>Départ</label>
+          <div class="row"><input id="startDate" type="datetime-local" step="1" class="num datetime"></div>
+        </div>
+        <div class="actions">
+          <button id="resetDate" class="btn ghost small">Date d’origine</button>
+          <span id="dateShift" class="dim"></span>
+        </div>
+        <p class="dim hintline">Strava refuse une activité dont la date de départ existe déjà : décalez-la
+          pour importer la version retouchée à côté de l’originale.</p>
+      </div>
+
+      <div class="card">
         <h2>Réglages d’analyse</h2>
         <div class="field"><label>Lissage vitesse</label><div class="row"><input id="optSpeedSmooth" type="number" min="1" step="1" value="5" class="num"><span class="u">s</span></div></div>
         <div class="field"><label>Base de calcul de la pente</label><div class="row"><input id="optGradeWin" type="number" min="5" step="5" value="40" class="num"><span class="u">m</span></div></div>
@@ -171,6 +185,7 @@
 <script src="js/track.js"></script>
 <script src="js/edit.js"></script>
 <script src="js/validate.js"></script>
+<script src="js/ui-common.js"></script>
 <script src="js/charts.js"></script>
 <script src="js/map.js"></script>
 <script src="js/app.js"></script>

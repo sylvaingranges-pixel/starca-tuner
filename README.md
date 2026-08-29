@@ -30,8 +30,9 @@ verticale et des gestes tactiles :
   fait défiler trois tailles, jusqu'au plein écran) ; deux doigts pour zoomer sur la carte ;
 * trois séries affichées au départ pour rester lisible — l'onglet **Graphes** permet
   d'afficher toutes les autres et de figer un axe Y entre deux valeurs ;
-* la retouche, les modifications empilées, les réglages et l'export s'ouvrent en
-  **feuilles glissantes** depuis la barre du bas ;
+* la retouche, les modifications empilées, les réglages (dont la date de la sortie et le
+  recalcul puissance / FC) et l'export s'ouvrent en **feuilles glissantes** depuis la barre
+  du bas ;
 * en paysage, la carte passe à gauche et les graphes à droite ;
 * à l'export, un bouton **Partager** apparaît quand le navigateur le permet (iOS, Android) :
   le GPX part directement vers Fichiers, Drive ou l'appli Strava.
@@ -76,8 +77,15 @@ utilisable comme filtre de retouche.
    Une transition progressive (raccord aux extrémités, lissage) évite les ruptures de vitesse.
 5. **Empilement des modifications** : chaque retouche appliquée s'ajoute à la liste et peut
    être désactivée ou supprimée ; on sélectionne ensuite un autre tronçon et on recommence.
-   La courbe orange sur le graphe de vitesse montre en permanence le résultat.
-6. **Export** : le GPX est recalculé, vérifié, puis téléchargé.
+6. **Aperçu « après retouche »** : une courbe orange se superpose à la série d'origine, sur
+   les mêmes abscisses, partout où quelque chose change. Toujours pour la **vitesse** ; pour
+   la **puissance** et la **fréquence cardiaque** dès que leur recalcul est coché — l'en-tête
+   du graphe affiche alors la comparaison sous le curseur (`277 → 307`). L'aperçu emploie
+   exactement le même calcul que l'export, ce que vérifie la suite de tests.
+7. **Date de la sortie** modifiable : tous les horodatages — et la date de `<metadata>` —
+   sont décalés d'autant, la durée et l'enchaînement restant identiques. Pratique parce que
+   Strava refuse une activité dont la date de départ existe déjà.
+8. **Export** : le GPX est recalculé, vérifié, puis téléchargé.
 
 ## Comment le fichier de sortie est reconstruit
 
@@ -98,7 +106,10 @@ Le tracé (la polyligne) et la cadence d'enregistrement sont des invariants ; se
 * toutes les autres séries (FC, cadence, température, puissance…) suivent la position, avec
   la même structure d'extensions XML que le fichier d'entrée. Deux options recalculent
   **puissance** et **fréquence cardiaque** en cohérence avec la nouvelle vitesse, à partir d'un
-  modèle physique paramétrable (masse, SCx, Crr) ;
+  modèle physique paramétrable (masse, SCx, Crr). La puissance suit le rapport des puissances
+  nécessaires avant et après (roulement, pesanteur, aérodynamique), la FC suit ce rapport de
+  façon amortie et plafonnée. À noter : une portion roue libre enregistrée à 0 W reste à 0 W —
+  un rapport multiplicatif ne crée pas de puissance à partir de rien ;
 * sans aucune modification, l'export est **identique au fichier d'entrée**, octet pour octet —
   y compris l'en-tête, les espaces de noms, le style d'indentation, la précision des altitudes
   et le découpage en `<trkseg>` (vérifié sur les exports Garmin Connect et Strava).

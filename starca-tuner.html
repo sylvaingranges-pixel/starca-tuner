@@ -97,6 +97,8 @@ button, input, select { font: inherit; color: inherit; }
 .chart-head .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .chart-head .lbl { color: var(--text); font-weight: 600; }
 .chart-head .cursor-val { color: var(--accent); font-family: ui-monospace, monospace; min-width: 48px; }
+.chart-head .ovlval { color: #f97316; }
+.chart-head .ovl { color: #f97316; font-size: 10px; }
 .chart-head .spacer { flex: 1; }
 .chart-head input[type=number] { width: 58px; background: #0d151d; border: 1px solid var(--line); border-radius: 4px; padding: 1px 4px; font-size: 11px; }
 .chart-head input[type=number]:disabled { opacity: .35; }
@@ -133,6 +135,8 @@ button, input, select { font: inherit; color: inherit; }
 .field > label { width: 150px; flex: none; color: var(--dim); font-size: 12px; }
 .field .row { display: flex; align-items: center; gap: 5px; flex: 1; }
 .field.checks { flex-direction: column; align-items: flex-start; gap: 3px; }
+.datetime { width: 190px !important; }
+.hintline { font-size: 11px; margin: 8px 0 0; line-height: 1.4; }
 .num { width: 74px; background: #0a1119; border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; }
 .u { color: var(--dim); font-size: 11px; }
 .chk { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; }
@@ -319,6 +323,20 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
           <div class="field"><label>Crr</label><div class="row"><input id="crr" type="number" step="0.001" value="0.005" class="num"></div></div>
           <div class="field"><label>FC maximale</label><div class="row"><input id="hrMax" type="number" step="1" value="190" class="num"><span class="u">bpm</span></div></div>
         </details>
+      </div>
+
+      <div class="card">
+        <h2>Date de la sortie</h2>
+        <div class="field">
+          <label>Départ</label>
+          <div class="row"><input id="startDate" type="datetime-local" step="1" class="num datetime"></div>
+        </div>
+        <div class="actions">
+          <button id="resetDate" class="btn ghost small">Date d’origine</button>
+          <span id="dateShift" class="dim"></span>
+        </div>
+        <p class="dim hintline">Strava refuse une activité dont la date de départ existe déjà : décalez-la
+          pour importer la version retouchée à côté de l’originale.</p>
       </div>
 
       <div class="card">
@@ -761,6 +779,22 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
     return lines.join('');
   }
 
+  /** Copie de <metadata> dont la date est décalée du même temps que la trace. */
+  function shiftMetaTime(node, shiftMs) {
+    var copy = { name: node.name, attrs: node.attrs, children: node.children.slice() };
+    for (var i = 0; i < copy.children.length; i++) {
+      var c = copy.children[i];
+      if (c.name === '#text' || X.localName(c.name) !== 'time') continue;
+      var raw = X.text(c).trim();
+      var ms = Date.parse(raw);
+      if (!isFinite(ms)) continue;
+      // on garde la forme d'écriture de l'entrée (avec ou sans millisecondes)
+      var text = fmtTime(ms + shiftMs, /\.\d+/.test(raw));
+      copy.children[i] = { name: c.name, attrs: c.attrs, children: [{ name: '#text', text: text }] };
+    }
+    return copy;
+  }
+
   /** Serialize points back to a GPX document mirroring the input structure. */
   function build(source, points, options) {
     options = options || {};
@@ -778,7 +812,11 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
       out.push('>\n');
     }
 
-    if (source.metadataNode) out.push(X.serialize(source.metadataNode, ind(1), unit));
+    if (source.metadataNode) {
+      var meta = source.metadataNode;
+      if (options.metaShiftMs) meta = shiftMetaTime(meta, options.metaShiftMs);
+      out.push(X.serialize(meta, ind(1), unit));
+    }
     var trkOpen = ind(1) + '<trk';
     for (var b = 0; b < source.trkAttrs.length; b++) trkOpen += ' ' + source.trkAttrs[b].name + '="' + X.encodeAttr(source.trkAttrs[b].value) + '"';
     out.push(trkOpen + '>\n');
@@ -1280,7 +1318,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
     var n = track.n, src = track.source, pts = src.points;
 
     var adjust = options.adjust || {};
-    var phys = { mass: adjust.mass || 83, cda: adjust.cda || 0.32, crr: adjust.crr || 0.005, rho: adjust.rho || 1.2, eff: 0.97 };
+    var phys = physFrom(adjust);
     var powerKey = null, hrKey = null;
     for (var c = 0; c < track.channels.length; c++) {
       var ch = track.channels[c];
@@ -1426,26 +1464,46 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
     };
   }
 
-  function applyEffortAdjust(track, src, factor, j, p, powerKey, hrKey, phys, adjust) {
+  /**
+   * Rapport puissance nouvelle / puissance d'origine au point j, d'après le
+   * modèle physique. Sert à la fois à l'aperçu dans les graphes et à l'export,
+   * pour que les deux racontent exactement la même chose.
+   */
+  function effortRatio(track, factor, j, phys) {
     var f = factor[Math.min(j, factor.length - 1)];
-    if (!isFinite(f) || Math.abs(f - 1) < 1e-6) return;
+    if (!isFinite(f) || Math.abs(f - 1) < 1e-6) return 1;
     var v = track.vSmooth[j];
-    if (!(v > 1)) return;
+    if (!(v > 1)) return 1;
     var grade = track.grade[j];
     var p0 = powerRequired(v, grade, phys);
     var p1 = powerRequired(v * f, grade, phys);
-    if (!(p0 > 1)) return;
-    var ratio = p1 / p0;
+    if (!(p0 > 1)) return 1;
+    return p1 / p0;
+  }
+
+  /** Fréquence cardiaque suivant la variation de puissance (modèle simple). */
+  function adjustedHr(hr, ratio, hrMax) {
+    return clamp(hr * Math.pow(ratio, 0.35), 35, hrMax || 190);
+  }
+
+  function physFrom(adjust) {
+    adjust = adjust || {};
+    return {
+      mass: adjust.mass || 83, cda: adjust.cda || 0.32,
+      crr: adjust.crr || 0.005, rho: adjust.rho || 1.2, eff: 0.97
+    };
+  }
+
+  function applyEffortAdjust(track, src, factor, j, p, powerKey, hrKey, phys, adjust) {
+    var ratio = effortRatio(track, factor, j, phys);
+    if (ratio === 1) return;
     if (adjust.power && powerKey && p.ext[powerKey] !== undefined) {
       var pw = parseFloat(p.ext[powerKey]);
       if (isFinite(pw)) p.ext[powerKey] = String(Math.max(0, pw * ratio));
     }
     if (adjust.hr && hrKey && p.ext[hrKey] !== undefined) {
       var hr = parseFloat(p.ext[hrKey]);
-      if (isFinite(hr)) {
-        var hrMax = adjust.hrMax || 190;
-        p.ext[hrKey] = String(clamp(hr * Math.pow(ratio, 0.35), 35, hrMax));
-      }
+      if (isFinite(hr)) p.ext[hrKey] = String(adjustedHr(hr, ratio, adjust.hrMax));
     }
   }
 
@@ -1467,6 +1525,9 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
     intervalSpeedKmh: intervalSpeedKmh,
     intervalValue: intervalValue,
     powerRequired: powerRequired,
+    effortRatio: effortRatio,
+    adjustedHr: adjustedHr,
+    physFrom: physFrom,
     fmtDur: fmtDur
   };
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -1604,6 +1665,202 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
 
 </script>
 <script>
+/* Helpers shared by the desktop and the mobile interfaces (no DOM here). */
+(function (global) {
+  'use strict';
+
+  function fmtClock(sec) {
+    sec = Math.max(0, Math.round(sec));
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    return h ? h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0')
+      : m + ':' + String(s).padStart(2, '0');
+  }
+
+  function fmtDelta(sec) {
+    var s = Math.round(Math.abs(sec));
+    var m = Math.floor(s / 60);
+    return (sec >= 0 ? '−' : '+') + (m ? m + ' min ' : '') + (s % 60) + ' s';
+  }
+
+  function fmtDist(m) { return m >= 1000 ? (m / 1000).toFixed(2) + ' km' : Math.round(m) + ' m'; }
+
+  /** Epoch ms -> valeur d'un <input type="datetime-local"> (heure locale). */
+  function toLocalInput(ms) {
+    var d = new Date(ms - new Date(ms).getTimezoneOffset() * 60000);
+    return d.toISOString().slice(0, 19);
+  }
+
+  /** Valeur d'un <input type="datetime-local"> -> epoch ms. */
+  function fromLocalInput(v) {
+    if (!v) return NaN;
+    var ms = new Date(v).getTime();
+    return isFinite(ms) ? ms : NaN;
+  }
+
+  /** Décalage lisible entre deux dates. */
+  function describeShift(deltaMs) {
+    if (!deltaMs) return 'date d’origine';
+    var s = Math.round(Math.abs(deltaMs) / 1000);
+    var d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+    var parts = [];
+    if (d) parts.push(d + ' j');
+    if (h) parts.push(h + ' h');
+    if (m || !parts.length) parts.push(m + ' min');
+    return (deltaMs > 0 ? 'décalée de +' : 'décalée de −') + parts.join(' ');
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&quot;';
+    });
+  }
+
+  /** Summary of the track between two sample indices. */
+  function segStats(track, i0, i1) {
+    i0 = Math.max(0, Math.min(track.n - 1, i0));
+    i1 = Math.max(0, Math.min(track.n - 1, i1));
+    if (i1 < i0) { var s = i0; i0 = i1; i1 = s; }
+    var dur = track.t[i1] - track.t[i0], dist = track.dist[i1] - track.dist[i0];
+    var gain = 0, moving = 0, movDist = 0;
+    for (var i = i0; i < i1; i++) {
+      var de = track.eleSmooth[i + 1] - track.eleSmooth[i];
+      if (de > 0) gain += de;
+      if (!track.gap[i] && track.dSeg[i] / Math.max(0.001, track.dtSeg[i]) > 0.8) {
+        moving += track.dtSeg[i]; movDist += track.dSeg[i];
+      }
+    }
+    return {
+      i0: i0, i1: i1, dur: dur, dist: dist, gain: gain,
+      avg: dur > 0 ? dist / dur * 3.6 : 0,
+      avgMoving: moving > 0 ? movDist / moving * 3.6 : 0,
+      grade: dist > 0 ? Math.atan2(track.eleSmooth[i1] - track.eleSmooth[i0], dist) * 180 / Math.PI : 0
+    };
+  }
+
+  function describeFilters(edit) {
+    if (!edit.filters.length) return 'tous les points';
+    return edit.filters.map(function (f) {
+      var s = (f.label || f.key).toLowerCase();
+      if (f.min != null && f.max != null) return s + ' ' + f.min + '–' + f.max + ' ' + (f.unit || '');
+      if (f.min != null) return s + ' > ' + f.min + ' ' + (f.unit || '');
+      return s + ' < ' + f.max + ' ' + (f.unit || '');
+    }).join(', ');
+  }
+
+  /** Rôle d'un canal d'extension : puissance, fréquence cardiaque, ou rien. */
+  function channelRole(ch) {
+    if (!ch.extKey) return null;
+    var last = ch.extKey.split('/').pop().split(':').pop().toLowerCase();
+    if (last === 'power' || last === 'watts' || last === 'powerinwatts') return 'power';
+    if (last === 'hr' || last === 'heartrate') return 'hr';
+    return null;
+  }
+
+  function pointFactor(factor, i, n) {
+    var f = i === 0 ? factor[0] : i >= n - 1 ? factor[n - 2] : (factor[i - 1] + factor[i]) / 2;
+    return isFinite(f) ? f : 1;
+  }
+
+  /**
+   * Courbes « après retouche » superposées aux séries d'origine, sur les mêmes
+   * abscisses : vitesse toujours, puissance et fréquence cardiaque quand leur
+   * recalcul est demandé. NaN partout où rien ne change.
+   * Le rapport de puissance vient du même calcul que l'export.
+   */
+  function overlays(track, edits, adjust) {
+    adjust = adjust || {};
+    var comp = global.Edits.composeFactors(track, edits);
+    var phys = global.Edits.physFrom(adjust);
+    var n = track.n;
+    var speed = new Float64Array(n);
+    var powerCh = null, hrCh = null;
+    track.channels.forEach(function (ch) {
+      var role = channelRole(ch);
+      if (role === 'power' && !powerCh) powerCh = ch;
+      if (role === 'hr' && !hrCh) hrCh = ch;
+    });
+    var power = adjust.power && powerCh ? new Float64Array(n) : null;
+    var hr = adjust.hr && hrCh ? new Float64Array(n) : null;
+    var any = false, anyPower = false, anyHr = false;
+
+    for (var i = 0; i < n; i++) {
+      var f = pointFactor(comp.factor, i, n);
+      if (Math.abs(f - 1) <= 1e-9) {
+        speed[i] = NaN;
+        if (power) power[i] = NaN;
+        if (hr) hr[i] = NaN;
+        continue;
+      }
+      any = true;
+      speed[i] = track.vSmooth[i] * 3.6 * f;
+      if (power || hr) {
+        var ratio = global.Edits.effortRatio(track, comp.factor, i, phys);
+        if (power) {
+          var p0 = powerCh.data[i];
+          if (isFinite(p0)) { power[i] = Math.max(0, p0 * ratio); anyPower = true; }
+          else power[i] = NaN;
+        }
+        if (hr) {
+          var h0 = hrCh.data[i];
+          if (isFinite(h0)) { hr[i] = global.Edits.adjustedHr(h0, ratio, adjust.hrMax); anyHr = true; }
+          else hr[i] = NaN;
+        }
+      }
+    }
+
+    var data = {};
+    data.speed = any ? speed : null;
+    if (powerCh) data[powerCh.key] = anyPower ? power : null;
+    if (hrCh) data[hrCh.key] = anyHr ? hr : null;
+    return { data: data, factor: comp.factor, perEdit: comp.perEdit, powerKey: powerCh && powerCh.key, hrKey: hrCh && hrCh.key };
+  }
+
+  /** Preview figures for an edit being configured. */
+  function previewEdit(track, edit) {
+    var r = global.Edits.resolveEdit(track, edit);
+    var nInt = 0, sumT = 0, maxNew = 0, sumF = 0, fw = 0;
+    for (var i = r.i0; i < r.i1; i++) {
+      if (Math.abs(r.factors[i] - 1) < 1e-9) continue;
+      nInt++; sumT += track.dtSeg[i];
+      sumF += r.factors[i] * track.dtSeg[i]; fw += track.dtSeg[i];
+      var v = global.Edits.intervalSpeedKmh(track, i) * r.factors[i];
+      if (v > maxNew) maxNew = v;
+    }
+    var st = segStats(track, r.i0, r.i1);
+    return {
+      count: nInt, share: st.dur > 0 ? sumT / st.dur : 0, avgFactor: fw ? sumF / fw : 1,
+      maxKmh: maxNew, saved: r.saved, warn: r.warn, segDur: st.dur
+    };
+  }
+
+  /**
+   * Construit le fichier de sortie et son rapport de validation.
+   * `options.startMs` déplace toute la sortie à une autre date : chaque
+   * horodatage — et la date de <metadata> — est décalé d'autant.
+   */
+  function buildExport(track, source, edits, options, fileName) {
+    var comp = global.Edits.composeFactors(track, edits);
+    var res = global.Edits.rebuild(track, comp.factor, options);
+    var shift = options && options.startMs ? Math.round(options.startMs) - track.t0Ms : 0;
+    if (shift) {
+      for (var i = 0; i < res.points.length; i++) res.points[i].timeMs += shift;
+    }
+    var text = global.GPX.build(source, res.points, { metaShiftMs: shift });
+    var check = global.GPXValidate.validate(text);
+    var name = (fileName || 'activite.gpx').replace(/\.gpx$/i, '') + '-retouche.gpx';
+    return { res: res, text: text, check: check, name: name };
+  }
+
+  global.UI = {
+    fmtClock: fmtClock, fmtDelta: fmtDelta, fmtDist: fmtDist, escapeHtml: escapeHtml,
+    toLocalInput: toLocalInput, fromLocalInput: fromLocalInput, describeShift: describeShift,
+    segStats: segStats, describeFilters: describeFilters, overlays: overlays, channelRole: channelRole,
+    previewEdit: previewEdit, buildExport: buildExport
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
 /* Synchronised time-series stack drawn on canvases.
  * All rows share the same X window; each row has its own Y scaling (auto on the
  * visible window, or a manual min/max).
@@ -1708,6 +1965,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
         '<span class="lbl">' + row.ch.label + '</span>' +
         '<span class="unit">' + (row.ch.unit ? '(' + row.ch.unit + ')' : '') + '</span>' +
         '<span class="cursor-val"></span>' +
+        '<span class="ovl"></span>' +
         '<span class="spacer"></span>' + headControls +
         '</div>' +
         '<canvas></canvas>';
@@ -1716,6 +1974,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
       row.canvas = wrap.querySelector('canvas');
       row.ctx = row.canvas.getContext('2d');
       row.valEl = wrap.querySelector('.cursor-val');
+      row.ovlEl = wrap.querySelector('.ovl');
       var auto = wrap.querySelector('.yauto input'), ymin = wrap.querySelector('.ymin'), ymax = wrap.querySelector('.ymax');
       if (auto) auto.addEventListener('change', function () {
         row.yMode = auto.checked ? 'auto' : 'fixed';
@@ -1990,16 +2249,41 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
 
   ChartStack.prototype.setOverlay = function (key, data) {
     if (data) this.overlays[key] = data; else delete this.overlays[key];
+    this._markOverlays();
+    this._updateCursorValues();
     this.draw();
+  };
+
+  /** Remplace toutes les superpositions d'un coup ({clé: données|null}). */
+  ChartStack.prototype.setOverlays = function (map) {
+    this.overlays = {};
+    for (var k in map) if (map[k]) this.overlays[k] = map[k];
+    this._markOverlays();
+    this._updateCursorValues();
+    this.draw();
+  };
+
+  ChartStack.prototype._markOverlays = function () {
+    var self = this;
+    this.rows.forEach(function (row) {
+      if (!row.ovlEl) return;
+      row.ovlEl.textContent = self.overlays[row.ch.key] ? '◆ après retouche' : '';
+    });
   };
 
   ChartStack.prototype._updateCursorValues = function () {
     var i = this.hoverX == null ? null : this.idxAt(this.hoverX);
+    var self = this;
     this.rows.forEach(function (row) {
       if (!row.valEl) return;
       if (i == null) { row.valEl.textContent = ''; return; }
       var v = row.ch.data[i];
-      row.valEl.textContent = isFinite(v) ? v.toFixed(row.ch.decimals) : '—';
+      var txt = isFinite(v) ? v.toFixed(row.ch.decimals) : '—';
+      var ov = self.overlays[row.ch.key];
+      var w = ov ? ov[i] : NaN;
+      row.valEl.innerHTML = isFinite(w)
+        ? txt + '<span class="ovlval"> → ' + w.toFixed(row.ch.decimals) + '</span>'
+        : txt;
     });
   };
 
@@ -2719,6 +3003,9 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
     S.map.setTrack(track);
     S.map.setView(0, track.n - 1);
 
+    $('startDate').value = UI.toLocalInput(track.t0Ms);
+    updateDateInfo();
+
     buildChannelChips();
     buildFilterRows();
     renderActivity();
@@ -2937,23 +3224,15 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
     updateOverlay();
   }
 
-  /** Modified-speed curve = applied edits (+ the one being configured). */
+  /** Courbes « après retouche » : vitesse, et puissance / FC si leur recalcul est coché. */
   function updateOverlay() {
     if (!S.track || !S.stack) return;
     var list = S.edits.slice();
     if (S.pending) list.push(S.pending);
-    var comp = Edits.composeFactors(S.track, list);
-    var t = S.track, n = t.n;
-    var any = false;
-    var over = new Float64Array(n);
-    for (var i = 0; i < n; i++) {
-      var f = i === 0 ? comp.factor[0] : i >= n - 1 ? comp.factor[n - 2] : (comp.factor[i - 1] + comp.factor[i]) / 2;
-      if (!isFinite(f)) f = 1;
-      if (Math.abs(f - 1) > 1e-9) { any = true; over[i] = t.vSmooth[i] * 3.6 * f; }
-      else over[i] = NaN;
-    }
-    S.stack.setOverlay('speed', any ? over : null);
+    var ov = UI.overlays(S.track, list, buildOptions().adjust);
+    S.stack.setOverlays(ov.data);
 
+    var t = S.track;
     var applied = Edits.composeFactors(S.track, S.edits);
     var saved = Edits.savedTime(S.track, applied.factor, 0, applied.factor.length);
     $('delta').textContent = saved ? 'Gain cumulé : ' + fmtDelta(saved) + '  ·  ' +
@@ -3012,8 +3291,17 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
 
   /* ---------------------------------------------------------------- export */
 
+  function updateDateInfo() {
+    if (!S.track) return;
+    var ms = UI.fromLocalInput($('startDate').value);
+    var delta = isFinite(ms) ? ms - S.track.t0Ms : 0;
+    $('dateShift').textContent = UI.describeShift(delta);
+  }
+
   function buildOptions() {
+    var startMs = UI.fromLocalInput($('startDate').value);
     return {
+      startMs: isFinite(startMs) ? startMs : null,
       align: $('optAlign').checked,
       adjust: {
         power: $('optPower').checked, hr: $('optHr').checked,
@@ -3026,14 +3314,12 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
   }
 
   function doExport() {
-    var comp = Edits.composeFactors(S.track, S.edits);
-    var res = Edits.rebuild(S.track, comp.factor, buildOptions());
-    var text = GPX.build(S.source, res.points);
-    var check = GPXValidate.validate(text);
+    var out = UI.buildExport(S.track, S.source, S.edits, buildOptions(), S.fileName);
+    var res = out.res, text = out.text, check = out.check;
     S.lastResult = res;
 
     var t = S.track;
-    var name = (S.fileName || 'activite.gpx').replace(/\.gpx$/i, '') + '-retouche.gpx';
+    var name = out.name;
     var html = '<table>' +
       tr('Durée', fmtClock(res.stats.oldDuration) + '  →  <b>' + fmtClock(res.stats.newDuration) + '</b>') +
       tr('Gain', '<b>' + fmtDelta(res.stats.savedSec) + '</b>') +
@@ -3132,6 +3418,7 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
     });
 
     ['optAlign', 'optPower', 'optHr'].forEach(function (id) { $(id).addEventListener('change', updateOverlay); });
+    ['mass', 'cda', 'crr', 'hrMax'].forEach(function (id) { $(id).addEventListener('input', updateOverlay); });
     ['optSpeedSmooth', 'optGradeWin', 'optPause'].forEach(function (id) {
       $(id).addEventListener('change', function () {
         if (!S.source) return;
@@ -3145,6 +3432,13 @@ kbd { background: var(--panel2); border: 1px solid var(--line); border-bottom-wi
         if (sel) S.stack.setSelectionIndices(sel.i0, sel.i1);
         buildChannelChips(); renderEdits(); updateOverlay();
       });
+    });
+
+    $('startDate').addEventListener('input', updateDateInfo);
+    $('resetDate').addEventListener('click', function () {
+      if (!S.track) return;
+      $('startDate').value = UI.toLocalInput(S.track.t0Ms);
+      updateDateInfo();
     });
 
     $('export').addEventListener('click', doExport);

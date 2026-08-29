@@ -17,6 +17,31 @@
 
   function fmtDist(m) { return m >= 1000 ? (m / 1000).toFixed(2) + ' km' : Math.round(m) + ' m'; }
 
+  /** Epoch ms -> valeur d'un <input type="datetime-local"> (heure locale). */
+  function toLocalInput(ms) {
+    var d = new Date(ms - new Date(ms).getTimezoneOffset() * 60000);
+    return d.toISOString().slice(0, 19);
+  }
+
+  /** Valeur d'un <input type="datetime-local"> -> epoch ms. */
+  function fromLocalInput(v) {
+    if (!v) return NaN;
+    var ms = new Date(v).getTime();
+    return isFinite(ms) ? ms : NaN;
+  }
+
+  /** Décalage lisible entre deux dates. */
+  function describeShift(deltaMs) {
+    if (!deltaMs) return 'date d’origine';
+    var s = Math.round(Math.abs(deltaMs) / 1000);
+    var d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+    var parts = [];
+    if (d) parts.push(d + ' j');
+    if (h) parts.push(h + ' h');
+    if (m || !parts.length) parts.push(m + ' min');
+    return (deltaMs > 0 ? 'décalée de +' : 'décalée de −') + parts.join(' ');
+  }
+
   function escapeHtml(s) {
     return String(s).replace(/[&<>"]/g, function (c) {
       return c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&quot;';
@@ -55,17 +80,72 @@
     }).join(', ');
   }
 
-  /** Modified-speed curve (km/h) over the original samples; NaN where untouched. */
-  function overlaySpeed(track, edits) {
+  /** Rôle d'un canal d'extension : puissance, fréquence cardiaque, ou rien. */
+  function channelRole(ch) {
+    if (!ch.extKey) return null;
+    var last = ch.extKey.split('/').pop().split(':').pop().toLowerCase();
+    if (last === 'power' || last === 'watts' || last === 'powerinwatts') return 'power';
+    if (last === 'hr' || last === 'heartrate') return 'hr';
+    return null;
+  }
+
+  function pointFactor(factor, i, n) {
+    var f = i === 0 ? factor[0] : i >= n - 1 ? factor[n - 2] : (factor[i - 1] + factor[i]) / 2;
+    return isFinite(f) ? f : 1;
+  }
+
+  /**
+   * Courbes « après retouche » superposées aux séries d'origine, sur les mêmes
+   * abscisses : vitesse toujours, puissance et fréquence cardiaque quand leur
+   * recalcul est demandé. NaN partout où rien ne change.
+   * Le rapport de puissance vient du même calcul que l'export.
+   */
+  function overlays(track, edits, adjust) {
+    adjust = adjust || {};
     var comp = global.Edits.composeFactors(track, edits);
-    var n = track.n, over = new Float64Array(n), any = false;
+    var phys = global.Edits.physFrom(adjust);
+    var n = track.n;
+    var speed = new Float64Array(n);
+    var powerCh = null, hrCh = null;
+    track.channels.forEach(function (ch) {
+      var role = channelRole(ch);
+      if (role === 'power' && !powerCh) powerCh = ch;
+      if (role === 'hr' && !hrCh) hrCh = ch;
+    });
+    var power = adjust.power && powerCh ? new Float64Array(n) : null;
+    var hr = adjust.hr && hrCh ? new Float64Array(n) : null;
+    var any = false, anyPower = false, anyHr = false;
+
     for (var i = 0; i < n; i++) {
-      var f = i === 0 ? comp.factor[0] : i >= n - 1 ? comp.factor[n - 2] : (comp.factor[i - 1] + comp.factor[i]) / 2;
-      if (!isFinite(f)) f = 1;
-      if (Math.abs(f - 1) > 1e-9) { any = true; over[i] = track.vSmooth[i] * 3.6 * f; }
-      else over[i] = NaN;
+      var f = pointFactor(comp.factor, i, n);
+      if (Math.abs(f - 1) <= 1e-9) {
+        speed[i] = NaN;
+        if (power) power[i] = NaN;
+        if (hr) hr[i] = NaN;
+        continue;
+      }
+      any = true;
+      speed[i] = track.vSmooth[i] * 3.6 * f;
+      if (power || hr) {
+        var ratio = global.Edits.effortRatio(track, comp.factor, i, phys);
+        if (power) {
+          var p0 = powerCh.data[i];
+          if (isFinite(p0)) { power[i] = Math.max(0, p0 * ratio); anyPower = true; }
+          else power[i] = NaN;
+        }
+        if (hr) {
+          var h0 = hrCh.data[i];
+          if (isFinite(h0)) { hr[i] = global.Edits.adjustedHr(h0, ratio, adjust.hrMax); anyHr = true; }
+          else hr[i] = NaN;
+        }
+      }
     }
-    return { data: any ? over : null, factor: comp.factor, perEdit: comp.perEdit };
+
+    var data = {};
+    data.speed = any ? speed : null;
+    if (powerCh) data[powerCh.key] = anyPower ? power : null;
+    if (hrCh) data[hrCh.key] = anyHr ? hr : null;
+    return { data: data, factor: comp.factor, perEdit: comp.perEdit, powerKey: powerCh && powerCh.key, hrKey: hrCh && hrCh.key };
   }
 
   /** Preview figures for an edit being configured. */
@@ -86,11 +166,19 @@
     };
   }
 
-  /** Build the output file and its validation report. */
+  /**
+   * Construit le fichier de sortie et son rapport de validation.
+   * `options.startMs` déplace toute la sortie à une autre date : chaque
+   * horodatage — et la date de <metadata> — est décalé d'autant.
+   */
   function buildExport(track, source, edits, options, fileName) {
     var comp = global.Edits.composeFactors(track, edits);
     var res = global.Edits.rebuild(track, comp.factor, options);
-    var text = global.GPX.build(source, res.points);
+    var shift = options && options.startMs ? Math.round(options.startMs) - track.t0Ms : 0;
+    if (shift) {
+      for (var i = 0; i < res.points.length; i++) res.points[i].timeMs += shift;
+    }
+    var text = global.GPX.build(source, res.points, { metaShiftMs: shift });
     var check = global.GPXValidate.validate(text);
     var name = (fileName || 'activite.gpx').replace(/\.gpx$/i, '') + '-retouche.gpx';
     return { res: res, text: text, check: check, name: name };
@@ -98,7 +186,8 @@
 
   global.UI = {
     fmtClock: fmtClock, fmtDelta: fmtDelta, fmtDist: fmtDist, escapeHtml: escapeHtml,
-    segStats: segStats, describeFilters: describeFilters, overlaySpeed: overlaySpeed,
+    toLocalInput: toLocalInput, fromLocalInput: fromLocalInput, describeShift: describeShift,
+    segStats: segStats, describeFilters: describeFilters, overlays: overlays, channelRole: channelRole,
     previewEdit: previewEdit, buildExport: buildExport
   };
 })(typeof window !== 'undefined' ? window : globalThis);

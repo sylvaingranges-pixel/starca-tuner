@@ -102,6 +102,7 @@
         '<span class="lbl">' + row.ch.label + '</span>' +
         '<span class="unit">' + (row.ch.unit ? '(' + row.ch.unit + ')' : '') + '</span>' +
         '<span class="cursor-val"></span>' +
+        '<span class="ovl"></span>' +
         '<span class="spacer"></span>' + headControls +
         '</div>' +
         '<canvas></canvas>';
@@ -110,6 +111,7 @@
       row.canvas = wrap.querySelector('canvas');
       row.ctx = row.canvas.getContext('2d');
       row.valEl = wrap.querySelector('.cursor-val');
+      row.ovlEl = wrap.querySelector('.ovl');
       var auto = wrap.querySelector('.yauto input'), ymin = wrap.querySelector('.ymin'), ymax = wrap.querySelector('.ymax');
       if (auto) auto.addEventListener('change', function () {
         row.yMode = auto.checked ? 'auto' : 'fixed';
@@ -384,16 +386,41 @@
 
   ChartStack.prototype.setOverlay = function (key, data) {
     if (data) this.overlays[key] = data; else delete this.overlays[key];
+    this._markOverlays();
+    this._updateCursorValues();
     this.draw();
+  };
+
+  /** Remplace toutes les superpositions d'un coup ({clé: données|null}). */
+  ChartStack.prototype.setOverlays = function (map) {
+    this.overlays = {};
+    for (var k in map) if (map[k]) this.overlays[k] = map[k];
+    this._markOverlays();
+    this._updateCursorValues();
+    this.draw();
+  };
+
+  ChartStack.prototype._markOverlays = function () {
+    var self = this;
+    this.rows.forEach(function (row) {
+      if (!row.ovlEl) return;
+      row.ovlEl.textContent = self.overlays[row.ch.key] ? '◆ après retouche' : '';
+    });
   };
 
   ChartStack.prototype._updateCursorValues = function () {
     var i = this.hoverX == null ? null : this.idxAt(this.hoverX);
+    var self = this;
     this.rows.forEach(function (row) {
       if (!row.valEl) return;
       if (i == null) { row.valEl.textContent = ''; return; }
       var v = row.ch.data[i];
-      row.valEl.textContent = isFinite(v) ? v.toFixed(row.ch.decimals) : '—';
+      var txt = isFinite(v) ? v.toFixed(row.ch.decimals) : '—';
+      var ov = self.overlays[row.ch.key];
+      var w = ov ? ov[i] : NaN;
+      row.valEl.innerHTML = isFinite(w)
+        ? txt + '<span class="ovlval"> → ' + w.toFixed(row.ch.decimals) + '</span>'
+        : txt;
     });
   };
 

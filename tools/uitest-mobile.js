@@ -99,6 +99,25 @@ const entry = process.env.ENTRY || 'mobile.html';
   await page.screenshot({ path: path.join(shots, 'm4-graphes.png') });
   await page.click('#sheetClose');
 
+  // --- recalcul puissance / FC : l'aperçu doit apparaître sur ces graphes
+  await page.click('.tab[data-sheet="opts"]');
+  await page.waitForTimeout(250);
+  for (const l of await page.$$('.chk')) {
+    const t = (await l.textContent()).trim();
+    if (/puissance|cardiaque/i.test(t)) await l.$eval('input', i => { i.checked = true; i.dispatchEvent(new Event('change')); });
+  }
+  const dv = await page.$('input.datetime');
+  const dBefore = dv ? await dv.inputValue() : '—';
+  if (dv) await page.$eval('input.datetime', i => { i.value = '2026-12-24T08:30:00'; i.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.waitForTimeout(250);
+  await page.click('#sheetClose');
+  await page.waitForTimeout(250);
+  const marks = await page.$$eval('.chart-row', rs => rs
+    .map(r => [r.querySelector('.lbl').textContent, r.querySelector('.ovl').textContent])
+    .filter(x => x[1]).map(x => x[0]).join(', '));
+  console.log('aperçus  :', marks || '(aucun)');
+  console.log('date     :', dBefore, '-> 2026-12-24T08:30:00');
+
   // --- carte : sélection le long du tracé
   await page.click('#mapSelect');
   const mb = await page.locator('#map').boundingBox();

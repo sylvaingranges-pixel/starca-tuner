@@ -231,6 +231,22 @@
     return lines.join('');
   }
 
+  /** Copie de <metadata> dont la date est décalée du même temps que la trace. */
+  function shiftMetaTime(node, shiftMs) {
+    var copy = { name: node.name, attrs: node.attrs, children: node.children.slice() };
+    for (var i = 0; i < copy.children.length; i++) {
+      var c = copy.children[i];
+      if (c.name === '#text' || X.localName(c.name) !== 'time') continue;
+      var raw = X.text(c).trim();
+      var ms = Date.parse(raw);
+      if (!isFinite(ms)) continue;
+      // on garde la forme d'écriture de l'entrée (avec ou sans millisecondes)
+      var text = fmtTime(ms + shiftMs, /\.\d+/.test(raw));
+      copy.children[i] = { name: c.name, attrs: c.attrs, children: [{ name: '#text', text: text }] };
+    }
+    return copy;
+  }
+
   /** Serialize points back to a GPX document mirroring the input structure. */
   function build(source, points, options) {
     options = options || {};
@@ -248,7 +264,11 @@
       out.push('>\n');
     }
 
-    if (source.metadataNode) out.push(X.serialize(source.metadataNode, ind(1), unit));
+    if (source.metadataNode) {
+      var meta = source.metadataNode;
+      if (options.metaShiftMs) meta = shiftMetaTime(meta, options.metaShiftMs);
+      out.push(X.serialize(meta, ind(1), unit));
+    }
     var trkOpen = ind(1) + '<trk';
     for (var b = 0; b < source.trkAttrs.length; b++) trkOpen += ' ' + source.trkAttrs[b].name + '="' + X.encodeAttr(source.trkAttrs[b].value) + '"';
     out.push(trkOpen + '>\n');

@@ -80,6 +80,28 @@ const sample = process.argv[2] || path.join(root, 'sample/sample-ride.gpx');
   console.log('axe X    :', axisTxt);
   await page.screenshot({ path: path.join(shots, '04-zoom.png') });
 
+  // aperçu « après retouche » sur la puissance / la FC
+  await page.check('#optPower');
+  await page.check('#optHr');
+  await page.waitForTimeout(400);
+  const marks = await page.$$eval('.chart-row', rs => rs
+    .map(r => [r.querySelector('.lbl').textContent, r.querySelector('.ovl').textContent])
+    .filter(x => x[1]).map(x => x[0]).join(', '));
+  console.log('aperçus  :', marks || '(aucun)');
+  if (!/Vitesse/.test(marks)) throw new Error('pas d\'aperçu sur la vitesse');
+  await page.mouse.move(box.x + box.width * 0.35, box.y + box.height / 2);
+  await page.waitForTimeout(250);
+  const comp = await page.$$eval('.chart-row', rs => rs
+    .filter(r => r.querySelector('.ovlval'))
+    .map(r => r.querySelector('.lbl').textContent + ' ' + r.querySelector('.cursor-val').textContent).join(' | '));
+  console.log('survol   :', comp || '(aucune comparaison)');
+
+  // date de la sortie
+  const d0 = await page.inputValue('#startDate');
+  await page.$eval('#startDate', i => { i.value = '2026-12-24T08:30:00'; i.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.waitForTimeout(200);
+  console.log('date     :', d0, '->', await page.inputValue('#startDate'), '|', (await page.textContent('#dateShift')).trim());
+
   // export
   await page.click('#export');
   await page.waitForSelector('#modal:not([hidden])');
